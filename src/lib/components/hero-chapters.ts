@@ -7,6 +7,7 @@ export interface HeroChapter {
   srcset?: string;
   motion?: string;
   position: string;
+  origin?: string;
   tint: string;
 }
 
@@ -23,47 +24,47 @@ export const heroChapters: HeroChapter[] = [
     copy: 'Keep the pulse steady. Let the ride cymbal and snare shape how it feels.',
     image: '/videos/sergio-groove-insert-poster.webp',
     motion: '/videos/sergio-groove-insert.mp4',
-    position: '50% 50%', tint: '#15100d',
+    position: '50% 0%', origin: '50% 14%', tint: '#120d0a',
   },
   {
     id: 'control', title: 'Control', start: .207,
     copy: 'Let the backbeat speak clearly. Keep the ghost notes soft enough that you feel them before you hear them.',
     image: 'home-stage.webp',
     srcset: '/images/home-stage-768.webp 768w, /images/home-stage.webp 1440w',
-    position: '50% 31%', tint: '#222126',
+    position: '50% 12%', origin: '50% 20%', tint: '#17161a',
   },
   {
     id: 'technique', title: 'Technique', start: .305,
     copy: 'A relaxed grip gives the stick room to rebound and leaves the hand ready for the next stroke.',
     image: 'recording.webp',
     srcset: '/images/recording-768.webp 768w, /images/recording-1280.webp 1280w, /images/recording.webp 2000w',
-    position: '57% 48%', tint: '#20150d',
+    position: '54% 0%', origin: '52% 12%', tint: '#140e0a',
   },
   {
     id: 'flow', title: 'Flow', start: .407,
     copy: 'Move the phrase from snare to toms and keep its place in the bar.',
     image: '/videos/sergio-flow-insert-poster.webp',
     motion: '/videos/sergio-flow-insert.mp4',
-    position: '50% 50%', tint: '#15100d',
+    position: '50% 34%', origin: '50% 42%', tint: '#120d0a',
   },
   {
     id: 'musicality', title: 'Musicality', start: .506,
     copy: 'Leave room for the bass, bring one accent forward, and let the cymbal ring.',
     image: 'records.webp',
-    position: '50% 48%', tint: '#301b15',
+    position: '40% 10%', origin: '42% 18%', tint: '#1e120e',
   },
   {
     id: 'anticipation', title: 'Before the hit', start: .602,
     copy: 'The first stick accent opens the original studio performance.',
     image: notesFilm.poster,
-    position: '50% 50%', tint: '#15100d',
+    position: '50% 50%', origin: '50% 50%', tint: '#100b09',
   },
   {
     id: 'discovery', title: 'The quiet notes', start: .945,
     copy: 'Same tempo. Same backbeat. Hear what four quiet snare strokes change.',
     image: 'home-percussion-workshop.webp',
     srcset: '/images/home-percussion-workshop-768.webp 768w, /images/home-percussion-workshop.webp 2000w',
-    position: '50% 50%', tint: '#241e19',
+    position: '50% 44%', origin: '50% 48%', tint: '#181410',
   },
 ];
 

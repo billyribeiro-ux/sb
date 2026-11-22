@@ -25,7 +25,10 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 body { margin: 0; font-size: 1rem; line-height: 1.55; }
-html { scroll-behavior: smooth; }
+html:not(.lenis-smooth) { scroll-behavior: smooth; }
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
 a { color: inherit; }
 button { font: inherit; }
 img { display: block; max-width: 100%; }
@@ -65,7 +68,8 @@ h1, h2, h3, p, figure { margin: 0; }
 .masthead.overlay {
   position: fixed; inset: 0 0 auto;
   isolation: isolate;
-  background: transparent;
+  background: linear-gradient(180deg, #0e0a09f2 0%, #0e0a09d9 100%);
+  backdrop-filter: blur(18px) saturate(130%);
   border-bottom-color: #f1d9bf38;
 }
 
@@ -74,25 +78,9 @@ h1, h2, h3, p, figure { margin: 0; }
   inset: 0;
   z-index: -1;
   overflow: hidden;
-  background: #100d12;
+  background: linear-gradient(180deg, #0e0a09f2 0%, #0e0a09d9 100%);
+  backdrop-filter: blur(18px) saturate(130%);
   pointer-events: none;
-}
-
-.masthead-glass::before,
-.masthead-glass::after {
-  content: '';
-  position: absolute;
-}
-
-.masthead-glass::before {
-  inset: 0;
-  background: url('/images/hero-opening-1280.webp') center 8% / cover no-repeat;
-}
-
-.masthead-glass::after {
-  inset: 0;
-  background: linear-gradient(105deg, #151012de, #15101e91 80%);
-  backdrop-filter: blur(16px) saturate(145%);
 }
 .masthead-inner { display: flex; height: 100%; align-items: center; justify-content: space-between; gap: 2rem; }
 .wordmark {
