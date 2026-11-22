@@ -5,19 +5,24 @@
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import SpeakerSlashIcon from 'phosphor-svelte/lib/SpeakerSlashIcon';
 
-  let { src, src4k, poster, label, active = true, heroMode = false }: {
+  let { src, src4k, poster, label, active = true, prepared = false, heroMode = false,
+    autoplay = true, loop = true, ontime }: {
     src: string;
     src4k?: string;
     poster: string;
     label: string;
     active?: boolean;
+    prepared?: boolean;
     heroMode?: boolean;
+    autoplay?: boolean;
+    loop?: boolean;
+    ontime?: (time: number) => void;
   } = $props();
   let video: HTMLVideoElement;
   let paused = $state(true);
   let muted = $state(true);
   let quality = $state<'hd' | '4k'>('hd');
-  const mediaSource = $derived(heroMode && !active ? undefined : quality === '4k' ? src4k ?? src : src);
+  const mediaSource = $derived(heroMode && !prepared && !active ? undefined : quality === '4k' ? src4k ?? src : src);
   let switchPlayback: { time: number; wasPlaying: boolean } | undefined;
   let prohibitedAutoplay = false;
   let manualPlay = false;
@@ -27,15 +32,18 @@
   onMount(() => {
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
     const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+    const { width, height } = video.getBoundingClientRect();
+    const density = window.devicePixelRatio || 1;
+    const needsUhd = width * density > 1280 || height * density > 720;
     if (src4k && !connection?.saveData && !reducedMotion.matches &&
-        matchMedia('(min-width: 1024px)').matches) quality = '4k';
+        (needsUhd || matchMedia('(min-width: 1024px)').matches)) quality = '4k';
     const observer = new IntersectionObserver(([entry]) => {
       playingArea = entry.isIntersecting && entry.intersectionRatio >= 0.4;
       update();
     }, { threshold: 0.4 });
 
     update = () => {
-      if (!active || document.hidden || !playingArea || prohibitedAutoplay ||
+      if (!active || document.hidden || !playingArea || prohibitedAutoplay || (!autoplay && !manualPlay) ||
         (reducedMotion.matches && !manualPlay)) {
         video.pause();
       } else if (video.paused) {
@@ -43,11 +51,19 @@
       }
     };
     observer.observe(video);
+    function pauseForOtherAudio(event: Event) {
+      if ((event as CustomEvent<Element>).detail === video || video.paused) return;
+      prohibitedAutoplay = true;
+      manualPlay = false;
+      video.pause();
+    }
     document.addEventListener('visibilitychange', update);
+    document.addEventListener('sergio:audio-focus', pauseForOtherAudio);
     reducedMotion.addEventListener('change', update);
     return () => {
       observer.disconnect();
       document.removeEventListener('visibilitychange', update);
+      document.removeEventListener('sergio:audio-focus', pauseForOtherAudio);
       reducedMotion.removeEventListener('change', update);
       video.pause();
     };
@@ -55,8 +71,21 @@
 
   $effect(() => {
     if (active) update();
-    else video?.pause();
+    else if (video) {
+      video.pause();
+      if (heroMode) {
+        video.currentTime = 0;
+        prohibitedAutoplay = false;
+        manualPlay = false;
+        video.muted = true;
+        muted = true;
+      }
+    }
   });
+
+  function claimPlayback() {
+    document.dispatchEvent(new CustomEvent('sergio:audio-focus', { detail: video }));
+  }
 
   function toggleQuality() {
     switchPlayback = { time: video.currentTime, wasPlaying: !video.paused };
@@ -76,6 +105,7 @@
   function toggleSound() {
     muted = !muted;
     video.muted = muted;
+    if (!muted) claimPlayback();
     if (!muted && video.paused) {
       manualPlay = true;
       prohibitedAutoplay = false;
@@ -104,13 +134,16 @@
     aria-label={label}
     {muted}
     playsinline
-    loop
-    preload="none"
+    {loop}
+    preload={heroMode && prepared ? 'auto' : 'none'}
     onloadedmetadata={restorePlayback}
-    onplay={() => { paused = false; }}
+    oncanplay={() => update()}
+    onplay={() => { paused = false; claimPlayback(); }}
+    onended={() => { prohibitedAutoplay = true; manualPlay = false; }}
     onpause={() => { paused = true; }}
+    ontimeupdate={() => ontime?.(video.currentTime)}
   ></video>
-  <div class="film-controls" inert={!active} data-hero-finale-controls={heroMode ? true : undefined}>
+  <div class="film-controls" inert={!heroMode && !active} data-hero-finale-controls={heroMode ? true : undefined}>
     {#if src4k}
       <button type="button" class="quality" onclick={toggleQuality}
         aria-label={quality === '4k' ? 'Switch to HD playback' : 'Switch to 4K upscale'}
@@ -143,9 +176,11 @@
   button:hover, a:hover { background: #3a2718; }
   .quality { font-weight: 720; min-width: 2.75rem; }
   .film-player.hero-mode { height: 100%; width: 100%; }
-  .hero-mode video { object-position: 52% center; }
+  .hero-mode video { object-fit: contain; object-position: center; }
   .hero-mode .film-controls { bottom: clamp(4.7rem, 11vh, 6.8rem); right: var(--gutter); z-index: 3; }
-  @media (max-width: 750px) { .hero-mode video { object-position: 35% center; } }
+  @media (max-width: 850px), (max-aspect-ratio: 5/4) {
+    .hero-mode video { object-position: 50% 42%; }
+  }
   @media (max-width: 600px) {
     .film-controls, noscript a { inset: auto .5rem .5rem auto; }
   }

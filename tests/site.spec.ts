@@ -33,16 +33,16 @@ test('opens, navigates, and closes the gallery with the keyboard', async ({ page
 });
 
 test('activates video on demand and restores focus', async ({ page }) => {
-  await page.route('https://www.youtube-nocookie.com/**', (route) => route.fulfill({ body: '' }));
   await page.goto('/');
-  const iframe = page.locator('iframe[src*="youtube-nocookie"]');
-  await expect(iframe).toHaveCount(0);
   const trigger = page.getByRole('link', { name: 'Watch performance' });
+  const dialog = page.getByRole('dialog', { name: 'Happy People 7/4' });
   await trigger.click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await expect(iframe).toHaveAttribute('src', /D4CExKKmFZE/);
+  await expect(dialog).toBeVisible();
+  const clip = dialog.locator('video');
+  await expect(clip).toHaveAttribute('src', /sergio-notes-between/);
+  await expect(clip).toHaveJSProperty('muted', true);
   await page.keyboard.press('Escape');
-  await expect(iframe).toHaveCount(0);
+  await expect(dialog).toBeHidden();
   await expect(trigger).toBeFocused();
 });
 
@@ -57,6 +57,7 @@ test('mobile menu works and reduced-motion layout stays within the viewport', as
   await page.keyboard.press('Escape');
   await expect(menu).toBeFocused();
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.locator('[data-hero-sequence]')).not.toHaveAttribute('data-cinematic', 'true');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await menu.click();
   await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Education' }).click();
@@ -64,27 +65,77 @@ test('mobile menu works and reduced-motion layout stays within the viewport', as
   await expect(menu).toHaveAttribute('aria-expanded', 'false');
 });
 
-test('hero holds the opening still, dissolves, then reveals the UHD film', async ({ page }) => {
+test('the inline opening runs on reload with navigation and Watch performance enabled', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/');
+  const opening = page.getByText('The Notes Between', { exact: true }).locator('..');
+  await expect(opening).toHaveAttribute('data-opening-motion', 'active');
+  await expect(page.getByRole('link', { name: 'Watch performance' })).toBeEnabled();
+  await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
+  await page.reload();
+  await expect(opening).toHaveAttribute('data-opening-motion', 'active');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('hero holds the portrait, dissolves through the studio shot and UHD film, and reverses', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/');
   const hero = page.locator('[data-hero-sequence]');
   const poster = hero.locator('[data-hero-poster]');
+  const studio = hero.locator('[data-hero-session]');
+  const bronze = hero.locator('[data-hero-bronze]');
+  const film = hero.locator('[data-hero-finale]');
+  const video = film.locator('video');
+  const sound = hero.getByRole('button', { name: 'Unmute film' });
+  const seek = (progress: number) => hero.evaluate((element, p) => {
+    const stage = element.querySelector('[data-hero-stage]')!;
+    const top = element.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo({ top: top + (element.clientHeight - stage.clientHeight) * p, behavior: 'instant' });
+  }, progress);
+
   await expect(hero).toHaveAttribute('data-scene', 'portrait');
   await expect(poster).toHaveCSS('opacity', '1');
+  await page.evaluate(() => document.fonts.ready.then(() => {}));
+  const nameRight = await hero.locator('.hero-name-last').evaluate((element) => element.getBoundingClientRect().right);
+  expect(nameRight).toBeLessThan(720);
 
-  await page.mouse.move(720, 410);
-  await page.mouse.wheel(0, 1080);
-  await expect(hero).toHaveAttribute('data-scene', 'dissolve');
+  await seek(.13);
+  await expect(poster).toHaveCSS('opacity', '1');
+  await expect(studio).toHaveCSS('visibility', 'hidden');
+
+  await seek(.34);
+  await expect(hero).toHaveAttribute('data-scene', 'portrait-dissolve');
   await expect(poster).toHaveCSS('transform', 'none');
-  await expect.poll(() => poster.evaluate((element) => Number(getComputedStyle(element).opacity)))
-    .toBeLessThan(0.5);
+  await expect.poll(() => poster.evaluate((element) => Number(getComputedStyle(element).opacity))).toBeLessThan(.45);
 
-  await page.mouse.wheel(0, 685);
+  await seek(.50);
+  await expect(hero).toHaveAttribute('data-scene', 'studio');
+  await expect(studio).toHaveCSS('opacity', '1');
+  await expect(studio).toHaveCSS('clip-path', 'none');
+  await expect(video).toHaveAttribute('src', /sergio-notes-between-4k/);
+  await expect(video).toHaveJSProperty('paused', true);
+
+  await seek(.65);
+  await expect(hero).toHaveAttribute('data-scene', 'bronze');
+  await expect(bronze).toHaveCSS('opacity', '1');
+  await expect(sound).toHaveCount(0);
+
+  await seek(.96);
   await expect(hero).toHaveAttribute('data-scene', 'film');
+  await expect(film).toHaveCSS('clip-path', 'none');
+  await expect(video).toHaveCSS('object-fit', 'contain');
+  await expect(sound).toBeVisible();
   await expect(hero.getByRole('button', { name: 'Switch to HD playback' })).toBeVisible();
-  await expect.poll(() => hero.locator('video').evaluate((video) => video instanceof HTMLVideoElement ? video.videoWidth : 0))
-    .toBe(3840);
+  await expect(video).toHaveJSProperty('videoWidth', 3840);
+  await sound.click();
+  await expect(video).toHaveJSProperty('muted', false);
+
+  await seek(0);
+  await expect(hero).toHaveAttribute('data-scene', 'portrait');
+  await expect(poster).toHaveCSS('opacity', '1');
+  await expect(film).toHaveAttribute('inert', '');
+  await expect(video).toHaveJSProperty('paused', true);
 });
 
 test('cymbal responds to a keyboard strike with the graphical fallback available', async ({ page }) => {

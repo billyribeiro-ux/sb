@@ -1,14 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { createPulseAudio, findAudioContext } from './pulse-audio';
+  import { createPulseAudio, findAudioContext, pulseBeats as beats, pulseTempo as tempo } from '../../lib/audio/pulse-audio';
 
-  const tempo = 84;
-  const beats = [
-    ['rest', 'ghost', 'rest', 'rest'],
-    ['accent', 'rest', 'rest', 'ghost'],
-    ['rest', 'rest', 'ghost', 'rest'],
-    ['accent', 'rest', 'rest', 'ghost'],
-  ] as const;
   const notes = beats.flat();
   const stepDuration = 60 / tempo / beats[0].length;
 

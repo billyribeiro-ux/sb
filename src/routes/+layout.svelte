@@ -43,7 +43,8 @@
 
 <svelte:window onkeydown={onMenuKey} />
 <a class="skip" href="#main-content">Skip to content</a>
-<header id="top" class="masthead" class:overlay={home} class:light class:expanded>
+<div id="top"></div>
+<header class="masthead" class:overlay={home} class:light class:expanded>
   <div class="masthead-inner shell">
     <a class="wordmark" href="/" aria-label="Sergio Bellotti home">
       <span class="brand-sticks" aria-hidden="true"></span>

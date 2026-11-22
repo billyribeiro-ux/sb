@@ -7,8 +7,11 @@
     centerY?: number
   } = $props()
 
+  let surface: HTMLDivElement
   let canvas: HTMLCanvasElement
   let renderer: ReturnType<typeof createHeroRimLight> | undefined
+  let stageCrop = $state(false)
+  let sweepProgress = 0
   let rendered = $state(false)
   let pulses = $state(0)
 
@@ -16,16 +19,37 @@
     const target = canvas.closest<HTMLElement>('[data-hero-stage]') ?? canvas.parentElement?.parentElement
     if (!target) return
 
+    const crop = matchMedia('(max-width: 850px), (max-aspect-ratio: 5/4)')
+    const updateCrop = () => { stageCrop = crop.matches }
+    updateCrop()
+    crop.addEventListener('change', updateCrop)
     renderer = createHeroRimLight(canvas, target, (ready) => { rendered = ready })
-    renderer.position(centerX, centerY)
-    return () => renderer?.destroy()
+    renderer.sweep(sweepProgress)
+    return () => {
+      crop.removeEventListener('change', updateCrop)
+      renderer?.destroy()
+    }
   })
 
+  const x = $derived(stageCrop ? 0.48 : centerX)
+  const y = $derived(stageCrop ? 0.76 : centerY)
+
   $effect(() => {
-    const x = centerX
-    const y = centerY
-    renderer?.position(x, y)
+    const positionX = x
+    const positionY = y
+    renderer?.position(positionX, positionY)
   })
+
+  export function sweep(progress: number) {
+    if (progress === sweepProgress) return
+
+    sweepProgress = progress
+    renderer?.sweep(progress)
+    if (!rendered) {
+      surface?.style.setProperty('--sweep-x', `${(progress - 0.5) * 70}%`)
+      surface?.style.setProperty('--sweep-gain', String(Math.sin(progress * Math.PI) * 0.62))
+    }
+  }
 
   export function strike() {
     if (rendered) renderer?.strike()
@@ -34,11 +58,12 @@
 </script>
 
 <div
+  bind:this={surface}
   class="rim-light"
   class:rendered
   aria-hidden="true"
-  style:--rim-x={`${centerX * 100}%`}
-  style:--rim-y={`${centerY * 100}%`}
+  style:--rim-x={`${x * 100}%`}
+  style:--rim-y={`${y * 100}%`}
 >
   <div class="fallback">
     {#if pulses}
@@ -76,6 +101,15 @@
       radial-gradient(ellipse 29% 10% at var(--glow-x) var(--glow-y), #ffd0904f, #e9924235 39%, transparent 84%),
       radial-gradient(ellipse 34% 18% at var(--glow-x) calc(var(--glow-y) + 8%), transparent 59%, #e9a15621 65%, transparent 73%);
     mask-image: linear-gradient(transparent 63%, #000 78%, #000 89%, transparent);
+  }
+
+  .fallback::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 12% 8% at var(--glow-x) var(--glow-y), #ffe5b0bb, #ffa75530 57%, transparent);
+    opacity: var(--sweep-gain, 0);
+    transform: translateX(var(--sweep-x, 0%));
   }
 
   .rendered .fallback { visibility: hidden; }

@@ -1,3 +1,8 @@
+.home-film-dialog {
+  width: min(100%, 118svh);
+  margin-inline: auto;
+}
+
 .home {
   --stage: #130d0a;
   --brass: #f0ba79;

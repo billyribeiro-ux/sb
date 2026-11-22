@@ -63,8 +63,8 @@ h1, h2, h3, p, figure { margin: 0; }
 }
 .masthead.light { color: var(--ink); background: var(--paper); border-color: var(--line); }
 .masthead.overlay {
-  position: absolute; inset: 0 0 auto;
-  background: linear-gradient(#100f0db5, #100f0d1a);
+  position: fixed; inset: 0 0 auto;
+  background: linear-gradient(#100f0df5, #100f0d70);
 }
 .masthead-inner { display: flex; height: 100%; align-items: center; justify-content: space-between; gap: 2rem; }
 .wordmark {

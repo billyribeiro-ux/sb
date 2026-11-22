@@ -14,6 +14,7 @@ const fragmentSource = `
   uniform vec2 uCenter;
   uniform vec2 uPointer;
   uniform float uStrike;
+    uniform float uSweep;
 
   float gaussian(float value) { return exp(-value * value); }
 
@@ -42,10 +43,13 @@ const fragmentSource = `
     float impact = (0.72 * surge + 0.27 * halo) * exp(-3.35 * strike) * step(0.0, uStrike);
 
     float sheen = front * 0.32 + back * 0.18 + faint * 0.075;
-    float alpha = clamp((sheen + softness * 0.145 + impact) * localization * underFace * rightFade * bottomFade, 0.0, 1.0);
+    float travel = mix(-0.33, 0.28, uSweep);
+    float reflection = gaussian((moving.x + moving.y * 1.16 - travel) * 17.0);
+    float sweep = sin(uSweep * 3.141593) * reflection * gaussian(curve * 13.0);
+    float alpha = clamp((sheen + softness * 0.145 + sweep * 0.55 + impact) * localization * underFace * rightFade * bottomFade, 0.0, 1.0);
     vec3 amber = vec3(0.97, 0.58, 0.22);
     vec3 gold = vec3(1.0, 0.82, 0.52);
-    vec3 light = mix(amber, gold, min(1.0, front + surge * step(0.0, uStrike)));
+    vec3 light = mix(amber, gold, min(1.0, front + sweep + surge * step(0.0, uStrike)));
 
     gl_FragColor = vec4(light * alpha, alpha);
   }
@@ -88,13 +92,14 @@ function setup(gl: WebGLRenderingContext) {
   const center = gl.getUniformLocation(program, 'uCenter')
   const pointer = gl.getUniformLocation(program, 'uPointer')
   const strike = gl.getUniformLocation(program, 'uStrike')
+  const sweep = gl.getUniformLocation(program, 'uSweep')
 
   function destroy() {
     gl.deleteBuffer(buffer)
     gl.deleteProgram(program)
   }
 
-  if (!buffer || position < 0 || !center || !pointer || !strike) {
+  if (!buffer || position < 0 || !center || !pointer || !strike || !sweep) {
     destroy()
     return null
   }
@@ -105,7 +110,7 @@ function setup(gl: WebGLRenderingContext) {
   gl.enableVertexAttribArray(position)
   gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0)
 
-  return { center, pointer, strike, destroy }
+  return { center, pointer, strike, sweep, destroy }
 }
 
 export function createHeroRimLight(canvas: HTMLCanvasElement, target: HTMLElement, onReady: (ready: boolean) => void) {
@@ -126,6 +131,7 @@ export function createHeroRimLight(canvas: HTMLCanvasElement, target: HTMLElemen
   let y = 0
   let pointerX = 0
   let pointerY = 0
+  let sweepProgress = 0
 
   function stop() {
     if (raf) cancelAnimationFrame(raf)
@@ -154,6 +160,7 @@ export function createHeroRimLight(canvas: HTMLCanvasElement, target: HTMLElemen
     gl.uniform2f(resources.center, centerX, centerY)
     gl.uniform2f(resources.pointer, x, y)
     gl.uniform1f(resources.strike, ringing ? elapsed : -1)
+    gl.uniform1f(resources.sweep, preference.matches ? 0 : sweepProgress)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
 
     if (!announced) {
@@ -269,6 +276,12 @@ export function createHeroRimLight(canvas: HTMLCanvasElement, target: HTMLElemen
     position(nextX: number, nextY: number) {
       centerX = nextX
       centerY = nextY
+      schedule()
+    },
+    sweep(progress: number) {
+      if (progress === sweepProgress) return
+
+      sweepProgress = progress
       schedule()
     },
     strike() {

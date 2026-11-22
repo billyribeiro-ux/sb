@@ -1,5 +1,13 @@
 export type PulseNote = 'rest' | 'ghost' | 'accent';
 
+export const pulseTempo = 84;
+export const pulseBeats = [
+  ['rest', 'ghost', 'rest', 'rest'],
+  ['accent', 'rest', 'rest', 'ghost'],
+  ['rest', 'rest', 'ghost', 'rest'],
+  ['accent', 'rest', 'rest', 'ghost'],
+] as const;
+
 export function findAudioContext() {
   const browser = window as Window & { webkitAudioContext?: typeof AudioContext };
   return window.AudioContext ?? browser.webkitAudioContext;
@@ -28,9 +36,36 @@ function snareStroke(context: AudioContext, accented: boolean) {
   return buffer;
 }
 
-export function createPulseAudio(context: AudioContext) {
+function backingStroke(context: AudioContext, instrument: 'kick' | 'hat') {
+  const kick = instrument === 'kick';
+  const duration = kick ? 0.22 : 0.075;
+  const length = Math.ceil(duration * context.sampleRate);
+  const buffer = context.createBuffer(1, length, context.sampleRate);
+  const samples = buffer.getChannelData(0);
+  let previousNoise = 0;
+
+  for (let frame = 0; frame < length; frame += 1) {
+    const time = frame / context.sampleRate;
+    const edge = Math.min(1, time / 0.0015, (duration - time) / 0.008);
+    if (kick) {
+      const sweep = 51 * time + 1.3 * (1 - Math.exp(-time * 66));
+      samples[frame] = Math.sin(2 * Math.PI * sweep) * Math.exp(-time * 22) * edge * 0.26;
+    } else {
+      const noise = Math.random() * 2 - 1;
+      samples[frame] = (noise - previousNoise * 0.8) * Math.exp(-time * 63) * edge * 0.034;
+      previousNoise = noise;
+    }
+  }
+
+  return buffer;
+}
+
+export function createPulseAudio(context: AudioContext, withBacking = false) {
   const output = context.createGain();
   const strokes = { accent: snareStroke(context, true), ghost: snareStroke(context, false) };
+  const backing = withBacking
+    ? { kick: backingStroke(context, 'kick'), hat: backingStroke(context, 'hat') }
+    : undefined;
   const scheduled = new Set<AudioBufferSourceNode>();
   output.connect(context.destination);
 
@@ -41,18 +76,25 @@ export function createPulseAudio(context: AudioContext) {
     else output.gain.value = level;
   }
 
+  function playStroke(buffer: AudioBuffer, start: number) {
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(output);
+    source.start(start);
+    scheduled.add(source);
+    source.onended = () => {
+      source.disconnect();
+      scheduled.delete(source);
+    };
+  }
+
   function schedule(notes: readonly PulseNote[], start: number, stepDuration: number) {
     for (const [step, note] of notes.entries()) {
-      if (note === 'rest') continue;
-      const source = context.createBufferSource();
-      source.buffer = strokes[note];
-      source.connect(output);
-      scheduled.add(source);
-      source.onended = () => {
-        source.disconnect();
-        scheduled.delete(source);
-      };
-      source.start(start + step * stepDuration);
+      const time = start + step * stepDuration;
+      if (note !== 'rest') playStroke(strokes[note], time);
+      if (!backing) continue;
+      if (step % 2 === 0) playStroke(backing.hat, time);
+      if (step % 8 === 0) playStroke(backing.kick, time);
     }
   }
 
