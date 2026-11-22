@@ -8,6 +8,7 @@
   import HeroRimLight from '#lib/motion/HeroRimLight.svelte';
   import { heroSequence } from '#lib/motion/hero-sequence';
   import { createCymbalAudio } from '#lib/motion/cymbal-audio';
+  import { heroChapters, notesFilm } from './hero-chapters';
   import './artist-hero.css';
 
   let { onwatch, filmBlocked }: { onwatch: (event: MouseEvent) => void; filmBlocked: boolean } = $props();
@@ -16,7 +17,7 @@
   let audio: ReturnType<typeof createCymbalAudio> | undefined;
   let filmPrepared = $state(false);
   let filmActive = $state(false);
-  let filmAngle = $state('Side angle');
+  let filmAngle = $state('Front angle');
   let strikes = $state(0);
 
   onMount(() => {
@@ -40,9 +41,8 @@
   }
 
   function updateShot(time: number) {
-    filmAngle = time < 1.467 ? 'Side angle'
-      : time < 5.833 ? 'Front angle'
-      : time < 8.6 ? 'Overhead'
+    filmAngle = time < 4.033333 ? 'Front angle'
+      : time < 6.8 ? 'Overhead'
       : 'Wide shot';
   }
 
@@ -54,11 +54,7 @@
     audio.strike();
   }
 
-  const firstName = [...'Sergio'];
-  const lastName = [...'Bellotti'];
   const portraitCrop = '(max-width: 850px), (max-aspect-ratio: 5/4)';
-  const portraitSizes = 'max(100vw, 72svh, 27rem)';
-  const openingSizes = 'max(90vw, 150svh, 55.5rem)';
 </script>
 
 <section
@@ -73,30 +69,18 @@
   <div class="hero-stage" data-hero-stage>
   <div class="hero-poster" data-hero-poster>
     <picture class="hero-plate" data-hero-backdrop>
-      <source media={portraitCrop} srcset="/images/hero-mobile-768.webp 768w, /images/hero-mobile.webp 1200w, /images/hero-mobile-1920.webp 1920w" sizes={portraitSizes} />
+      <source media={portraitCrop} srcset="/images/hero-opening-mobile-768.webp 768w, /images/hero-opening-mobile.webp 1200w" sizes="min(100vw, 46svh)" />
       <img
-        src="/images/hero.webp"
-        srcset="/images/hero-1280.webp 1280w, /images/hero.webp 2560w, /images/hero-3840.webp 3840w"
-        sizes={openingSizes}
-        alt="Sergio Bellotti smiling behind a hammered bronze cymbal"
-        width="2560"
-        height="1706"
+        src="/images/hero-opening.webp"
+        srcset="/images/hero-opening-1280.webp 1280w, /images/hero-opening.webp 3840w"
+        sizes="67vw"
+        alt="Sergio Bellotti behind a bronze cymbal in the studio"
+        width="3840"
+        height="2560"
         fetchpriority="high"
       />
     </picture>
     <div class="hero-poster-shade"></div>
-    <picture class="hero-subject" data-hero-foreground aria-hidden="true">
-      <source media={portraitCrop} srcset="/images/hero-subject-mobile-768.webp 768w, /images/hero-subject-mobile.webp 1200w, /images/hero-subject-mobile-1920.webp 1920w" sizes={portraitSizes} />
-      <img
-        src="/images/hero-subject.webp"
-        srcset="/images/hero-subject-1280.webp 1280w, /images/hero-subject.webp 2560w, /images/hero-subject-3840.webp 3840w"
-        sizes={openingSizes}
-        alt=""
-        width="2560"
-        height="1706"
-        fetchpriority="low"
-      />
-    </picture>
     <div class="hero-rim" data-hero-rim aria-hidden="true">
       <HeroRimLight bind:this={rimLight} />
     </div>
@@ -108,45 +92,39 @@
     <div class="hero-poster-vignette"></div>
     <div class="hero-name" data-hero-type>
       <ArtistOpening />
-      <span class="hero-name-first" aria-hidden="true"><span data-hero-name-line>{#each firstName as character}<span data-hero-letter>{character}</span>{/each}</span></span>
-      <span class="hero-name-last" aria-hidden="true"><span data-hero-name-line>{#each lastName as character}<span data-hero-letter>{character}</span>{/each}</span></span>
+      <span class="hero-name-first" aria-hidden="true"><span data-hero-name-line>Sergio</span></span>
+      <span class="hero-name-last" aria-hidden="true"><span data-hero-name-line>Bellotti</span></span>
     </div>
   </div>
 
-  <div class="hero-session" data-hero-session>
-    <picture class="hero-session-frame">
-      <source media={portraitCrop} srcset="/images/performance-mobile-768.webp 768w, /images/performance-mobile.webp 1200w, /images/hero-session-mobile-1920.webp 1920w" sizes="max(100vw, 80svh)" />
-      <img
-        data-hero-session-image
-        src="/images/performance.webp"
-        srcset="/images/performance-1280.webp 1280w, /images/performance.webp 2560w, /images/performance-3840.webp 3840w"
-        sizes="max(100vw, 150svh)"
-        alt=""
-        width="2560"
-        height="1706"
-        decoding="async"
-        fetchpriority="low"
-      />
-    </picture>
-    <div class="hero-session-title">
-      <p class="hero-film-label hero-film-line"><span data-hero-session-line>Anticipation</span></p>
-      <p class="hero-film-line"><span data-hero-session-line>Before the hit</span></p>
-      <p class="hero-film-copy hero-film-line"><span data-hero-session-line>Sergio in the studio · from the artist’s photo archive</span></p>
-    </div>
-  </div>
-
-  <div class="hero-bronze" data-hero-bronze aria-hidden="true">
-    <img src="/images/hero-bronze-1280.webp" srcset="/images/hero-bronze-1280.webp 1280w, /images/hero-bronze.webp 2560w" sizes="100vw" width="1280" height="672" decoding="async" fetchpriority="low" alt="" />
-  </div>
-  <div class="hero-darkroom" data-hero-darkroom aria-hidden="true"></div>
+  {#each heroChapters as chapter (chapter.id)}
+    <section
+      class="hero-chapter"
+      data-hero-chapter={chapter.id}
+      inert
+      aria-labelledby={`hero-chapter-${chapter.id}`}
+      style:--chapter-focus={chapter.position}
+      style:--chapter-tint={chapter.tint}
+    >
+      <picture class="hero-chapter-plate" data-chapter-plate>
+        {#if chapter.mobile}<source media={portraitCrop} data-srcset={chapter.mobile} />{/if}
+        <img data-src={chapter.image.startsWith('/') ? chapter.image : `/images/${chapter.image}`} data-srcset={chapter.srcset} sizes="(max-width: 850px) 100vw, 78vw" alt="" decoding="async" />
+      </picture>
+      <div class="hero-chapter-grade" aria-hidden="true"></div>
+      <div class="hero-chapter-copy">
+        <h2 class="hero-film-line" id={`hero-chapter-${chapter.id}`}><span data-chapter-line>{chapter.title}</span></h2>
+        <p class="hero-film-line"><span data-chapter-line>{chapter.copy}</span></p>
+        {#if chapter.id === 'discovery'}
+          <a href="#hear-the-difference" data-chapter-link>Try the ghost-note comparison</a>
+        {/if}
+      </div>
+    </section>
+  {/each}
 
   <div class="hero-finale" data-hero-finale aria-hidden="true" inert>
     <div class="hero-finale-screen" data-hero-video>
       <PerformanceFilm
-        src="/videos/sergio-notes-between.mp4"
-        src4k="/videos/sergio-notes-between-4k.mp4"
-        poster="/videos/sergio-notes-between-poster.webp"
-        label="Sergio Bellotti performing Happy People 7/4 in the studio"
+        {...notesFilm}
         prepared={filmPrepared}
         active={filmActive && !filmBlocked}
         loop={false}
@@ -168,12 +146,12 @@
     </div>
   </div>
 
-  <div class="hero-impact" data-hero-impact aria-hidden="true"></div>
+  <div class="hero-cut-light" data-hero-cut-light aria-hidden="true"></div>
 
   <div class="hero-meta" data-hero-details>
-    <p class="hero-origin" data-hero-opening-copy>Bari, Italy <span></span> Boston, MA</p>
-    <p class="hero-roles" data-hero-opening-copy>Drummer · Educator · Producer</p>
-    <p class="hero-credential" data-hero-opening-copy>Associate Professor of Percussion<br />Berklee College of Music</p>
+    <p class="hero-origin">Bari, Italy <span></span> Boston, MA</p>
+    <p class="hero-roles">Drummer · Educator · Producer</p>
+    <p class="hero-credential">Associate Professor of Percussion<br />Berklee College of Music</p>
   </div>
 
   <div class="hero-dock">

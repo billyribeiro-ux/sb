@@ -6,17 +6,12 @@
   import ModalShell from '#lib/components/ModalShell.svelte';
   import GalleryDialog from '#lib/components/GalleryDialog.svelte';
   import PerformanceFilm from '#lib/components/PerformanceFilm.svelte';
+  import { notesFilm } from '#lib/components/hero-chapters';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import './home.css';
 
   let reelOpen = $state(false);
   let galleryIndex = $state<number | null>(null);
-  const notesFilm = {
-    src: '/videos/sergio-notes-between.mp4',
-    src4k: '/videos/sergio-notes-between-4k.mp4',
-    poster: '/videos/sergio-notes-between-poster.webp',
-    label: 'Sergio Bellotti performing Happy People 7/4 in the studio'
-  };
 
   const gallery = [
     { src: '/images/drum-solo.webp', thumb: '/images/drum-solo-1280.webp', alt: 'Sergio Bellotti facing the camera behind a red Yamaha drum kit', caption: 'On the kit', width: 2000, height: 1334, thumbWidth: 1280, thumbHeight: 854 },

@@ -77,14 +77,13 @@ test('the inline opening runs on reload with navigation and Watch performance en
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
-test('hero holds the portrait, dissolves through the studio shot and UHD film, and reverses', async ({ page }) => {
+test('hero reveals nine chapters, plays the uncropped film, and reverses', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/');
   const hero = page.locator('[data-hero-sequence]');
   const poster = hero.locator('[data-hero-poster]');
-  const studio = hero.locator('[data-hero-session]');
-  const bronze = hero.locator('[data-hero-bronze]');
+  const chapters = hero.locator('[data-hero-chapter]');
   const film = hero.locator('[data-hero-finale]');
   const video = film.locator('video');
   const sound = hero.getByRole('button', { name: 'Unmute film' });
@@ -96,32 +95,34 @@ test('hero holds the portrait, dissolves through the studio shot and UHD film, a
 
   await expect(hero).toHaveAttribute('data-scene', 'portrait');
   await expect(poster).toHaveCSS('opacity', '1');
+  await expect(hero.locator('.hero-plate img')).toHaveCSS('object-fit', 'contain');
+  await expect(chapters).toHaveCount(7);
   await page.evaluate(() => document.fonts.ready.then(() => {}));
   const nameRight = await hero.locator('.hero-name-last').evaluate((element) => element.getBoundingClientRect().right);
   expect(nameRight).toBeLessThan(720);
 
-  await seek(.13);
+  await seek(.10);
   await expect(poster).toHaveCSS('opacity', '1');
-  await expect(studio).toHaveCSS('visibility', 'hidden');
 
-  await seek(.34);
-  await expect(hero).toHaveAttribute('data-scene', 'portrait-dissolve');
-  await expect(poster).toHaveCSS('transform', 'none');
-  await expect.poll(() => poster.evaluate((element) => Number(getComputedStyle(element).opacity))).toBeLessThan(.45);
-
-  await seek(.50);
-  await expect(hero).toHaveAttribute('data-scene', 'studio');
-  await expect(studio).toHaveCSS('opacity', '1');
-  await expect(studio).toHaveCSS('clip-path', 'none');
+  for (const [position, scene, title] of [
+    [.22, 'groove', 'Groove'],
+    [.33, 'control', 'Control'],
+    [.44, 'technique', 'Technique'],
+    [.55, 'flow', 'Flow'],
+    [.66, 'musicality', 'Musicality'],
+    [.77, 'anticipation', 'Before the hit'],
+  ] as const) {
+    await seek(position);
+    await expect(hero).toHaveAttribute('data-scene', scene);
+    await expect(hero.getByRole('heading', { name: title })).toBeVisible();
+  }
+  await expect(hero.locator('[data-hero-chapter="anticipation"] img'))
+    .toHaveAttribute('src', /sergio-notes-between-poster\.webp/);
   await expect(video).toHaveAttribute('src', /sergio-notes-between-4k/);
   await expect(video).toHaveJSProperty('paused', true);
-
-  await seek(.65);
-  await expect(hero).toHaveAttribute('data-scene', 'bronze');
-  await expect(bronze).toHaveCSS('opacity', '1');
   await expect(sound).toHaveCount(0);
 
-  await seek(.96);
+  await seek(.89);
   await expect(hero).toHaveAttribute('data-scene', 'film');
   await expect(film).toHaveCSS('clip-path', 'none');
   await expect(video).toHaveCSS('object-fit', 'contain');
@@ -130,6 +131,10 @@ test('hero holds the portrait, dissolves through the studio shot and UHD film, a
   await expect(video).toHaveJSProperty('videoWidth', 3840);
   await sound.click();
   await expect(video).toHaveJSProperty('muted', false);
+
+  await seek(.99);
+  await expect(hero).toHaveAttribute('data-scene', 'discovery');
+  await expect(hero.getByRole('link', { name: 'Try the ghost-note comparison' })).toBeVisible();
 
   await seek(0);
   await expect(hero).toHaveAttribute('data-scene', 'portrait');
