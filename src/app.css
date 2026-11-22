@@ -64,7 +64,35 @@ h1, h2, h3, p, figure { margin: 0; }
 .masthead.light { color: var(--ink); background: var(--paper); border-color: var(--line); }
 .masthead.overlay {
   position: fixed; inset: 0 0 auto;
-  background: linear-gradient(#100f0df5, #100f0d70);
+  isolation: isolate;
+  background: transparent;
+  border-bottom-color: #f1d9bf38;
+}
+
+.masthead-glass {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background: #100d12;
+  pointer-events: none;
+}
+
+.masthead-glass::before,
+.masthead-glass::after {
+  content: '';
+  position: absolute;
+}
+
+.masthead-glass::before {
+  inset: 0;
+  background: url('/images/hero-opening-1280.webp') center 8% / cover no-repeat;
+}
+
+.masthead-glass::after {
+  inset: 0;
+  background: linear-gradient(105deg, #151012de, #15101e91 80%);
+  backdrop-filter: blur(16px) saturate(145%);
 }
 .masthead-inner { display: flex; height: 100%; align-items: center; justify-content: space-between; gap: 2rem; }
 .wordmark {

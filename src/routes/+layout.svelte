@@ -45,6 +45,7 @@
 <a class="skip" href="#main-content">Skip to content</a>
 <div id="top"></div>
 <header class="masthead" class:overlay={home} class:light class:expanded>
+  {#if home}<span class="masthead-glass" aria-hidden="true"></span>{/if}
   <div class="masthead-inner shell">
     <a class="wordmark" href="/" aria-label="Sergio Bellotti home">
       <span class="brand-sticks" aria-hidden="true"></span>

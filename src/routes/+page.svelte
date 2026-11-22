@@ -17,7 +17,7 @@
     { src: '/images/drum-solo.webp', thumb: '/images/drum-solo-1280.webp', alt: 'Sergio Bellotti facing the camera behind a red Yamaha drum kit', caption: 'On the kit', width: 2000, height: 1334, thumbWidth: 1280, thumbHeight: 854 },
     { src: '/images/home-stage.webp', thumb: '/images/home-stage-thumb.webp', alt: 'Sergio Bellotti sits behind a dark blue drum kit onstage', caption: 'Live on stage', width: 1440, height: 1152, thumbWidth: 1200, thumbHeight: 900 },
     { src: '/images/recording.webp', thumb: '/images/home-recording-thumb.webp', alt: 'An overhead view of Sergio at a red drum kit', caption: 'In the studio', width: 2000, height: 1334, thumbWidth: 1280, thumbHeight: 854 },
-    { src: '/images/workshop.webp', thumb: '/images/home-taipei-thumb.webp', alt: 'Sergio and participants at the Taipei International Percussion Summer Camp', caption: 'Taipei percussion camp', width: 2000, height: 1502, thumbWidth: 1280, thumbHeight: 854 },
+    { src: '/images/home-percussion-workshop.webp', thumb: '/images/home-percussion-workshop-768.webp', alt: 'Sergio Bellotti with percussion students and a drum kit', caption: 'Percussion workshop', width: 2000, height: 1334, thumbWidth: 768, thumbHeight: 512 },
     { src: '/images/contact-portrait.webp', thumb: '/images/home-cymbal-thumb.webp', alt: 'Sergio holds a cymbal outdoors', caption: 'Away from the kit', width: 2000, height: 1334, thumbWidth: 1280, thumbHeight: 960 },
   ];
 
@@ -47,7 +47,7 @@
       </div>
       <p>From the first stick accent to a full-kit view. The audio comes from the original studio performance.</p>
     </div>
-    <div class="shell reel-frame" data-motion-film-screen>
+    <div class="shell reel-frame" data-motion-reveal>
       <PerformanceFilm
         {...notesFilm}
         active={!reelOpen}
@@ -66,8 +66,8 @@
   <section class="intro" id="about" aria-labelledby="intro-title">
     <div class="shell intro-grid">
       <figure class="intro-photo" data-motion-reveal>
-        <div class="photo-overflow" data-motion-frame>
-          <img src="/images/portrait.webp" srcset="/images/portrait-768.webp 768w, /images/portrait-1280.webp 1280w, /images/portrait.webp 2000w" sizes="(max-width: 750px) 92vw, 55vw" alt="Sergio Bellotti between two white drumheads" width="2000" height="1334" loading="lazy" decoding="async" data-motion-parallax />
+        <div class="photo-overflow">
+          <img src="/images/portrait.webp" srcset="/images/portrait-768.webp 768w, /images/portrait-1280.webp 1280w, /images/portrait.webp 2000w" sizes="(max-width: 750px) 92vw, 55vw" alt="Sergio Bellotti between two white drumheads" width="2000" height="1334" loading="lazy" decoding="async" />
         </div>
         <figcaption><span>Sergio Bellotti</span><span>Artist archive</span></figcaption>
       </figure>
@@ -101,16 +101,16 @@
       <div class="work-grid">
         <article data-motion-reveal>
           <a href="/work/">
-            <figure data-motion-frame>
-              <img src="/images/home-stage.webp" srcset="/images/home-stage-768.webp 768w, /images/home-stage.webp 1440w" sizes="(max-width: 750px) 90vw, 46vw" alt="Sergio Bellotti sits behind a dark blue drum kit onstage" width="1440" height="1152" loading="lazy" decoding="async" data-motion-parallax />
+            <figure>
+              <img src="/images/home-stage.webp" srcset="/images/home-stage-768.webp 768w, /images/home-stage.webp 1440w" sizes="(max-width: 750px) 90vw, 46vw" alt="Sergio Bellotti sits behind a dark blue drum kit onstage" width="1440" height="1152" loading="lazy" decoding="async" />
             </figure>
             <div><h3>Live &amp; on record</h3><p>Explore the bands, sessions, and recordings.</p></div>
           </a>
         </article>
         <article data-motion-reveal>
           <a href="/education/">
-            <figure data-motion-frame>
-              <img src="/images/home-ensemble.webp" srcset="/images/home-ensemble-768.webp 768w, /images/home-ensemble-1280.webp 1280w, /images/home-ensemble.webp 1920w" sizes="(max-width: 750px) 90vw, 46vw" alt="Sergio Bellotti with an ensemble of musicians holding their instruments" width="1920" height="1536" loading="lazy" decoding="async" data-motion-parallax />
+            <figure>
+              <img src="/images/home-ensemble.webp" srcset="/images/home-ensemble-768.webp 768w, /images/home-ensemble-1280.webp 1280w, /images/home-ensemble.webp 1920w" sizes="(max-width: 750px) 90vw, 46vw" alt="Sergio Bellotti with an ensemble of musicians holding their instruments" width="1920" height="1536" loading="lazy" decoding="async" />
             </figure>
             <div><h3>Teaching &amp; clinics</h3><p>Private lessons, workshops, and percussion at Berklee.</p></div>
           </a>

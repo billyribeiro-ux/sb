@@ -3,7 +3,7 @@
   --hero-brass: #efb87d;
   --hero-dark: #100b09;
   --hero-height: max(37rem, 100svh);
-  --hero-runway: 8.7;
+  --hero-runway: 6.3;
   position: relative;
   background: var(--hero-dark);
   color: var(--hero-cream);
@@ -17,7 +17,7 @@
 .hero-stage { height: var(--hero-height); position: relative; isolation: isolate; overflow: clip; }
 .artist-hero[data-cinematic='true'] .hero-stage { position: sticky; top: 0; }
 
-.artist-hero :is(.hero-poster, .hero-chapter, .hero-finale, .hero-plate, .hero-poster-shade, .hero-poster-vignette, .hero-rim, .hero-finale-screen, .hero-cut-light) {
+.artist-hero :is(.hero-poster, .hero-chapter, .hero-finale, .hero-plate, .hero-poster-shade, .hero-poster-vignette, .hero-rim, .hero-finale-screen, .hero-cut-light, .hero-edit-shadow) {
   position: absolute;
   inset: 0;
 }
@@ -31,16 +31,12 @@
 .hero-plate img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  object-position: right center;
-  filter: brightness(.89) saturate(.90);
+  object-fit: cover;
+  object-position: center top;
+  filter: brightness(.93) saturate(.92);
 }
 
-.artist-hero .hero-plate {
-  z-index: 0;
-  inset: calc(var(--header) * .66) 0 1rem 24%;
-  mask-image: linear-gradient(90deg, transparent, #000 13%, #000 96%, transparent);
-}
+.artist-hero .hero-plate { z-index: 0; top: calc(var(--header) - 3.2svh); }
 .hero-poster-shade {
   z-index: 1;
   background:
@@ -154,6 +150,15 @@
 .hero-dock :is(a, button):focus-visible { outline-color: #fff0d7; }
 .hero-scroll svg { color: var(--hero-brass); }
 .hero-scroll:hover { text-decoration: underline; text-underline-offset: .32em; }
+.hero-dock .hero-next {
+  display: none;
+  border: 0;
+  background: none;
+  padding-inline: 0;
+  cursor: pointer;
+}
+.artist-hero[data-cinematic='true']:not([data-scene='discovery']) .hero-dock .hero-next { display: inline-flex; }
+.artist-hero[data-cinematic='true']:not([data-scene='discovery']) .hero-dock > a.hero-scroll { display: none; }
 .hero-actions { display: flex; align-items: center; gap: .6rem; }
 .hero-dock :is(.hero-watch, .hero-strike) { padding: .5rem .84rem; }
 .hero-strike {
@@ -188,21 +193,41 @@
 
 .hero-chapter {
   z-index: 2;
-  visibility: hidden;
+  display: none;
   overflow: clip;
   background: var(--chapter-tint);
 }
+
+.hero-chapter[data-shot-active='true'] { display: block; }
 
 .hero-chapter-plate, .hero-chapter-grade {
   position: absolute;
   inset: 0;
 }
 
+.hero-chapter-plate { inset: var(--header) 0 3.8rem; }
+
 .hero-chapter-plate img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   object-position: var(--chapter-focus);
+}
+
+.hero-chapter-plate video {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+
+.hero-chapter-plate video[data-playing='true'] { opacity: 1; }
+
+.hero-motion-chapter .hero-chapter-plate :is(img, video) {
+  object-fit: contain;
+  object-position: center;
 }
 
 .hero-chapter-grade {
@@ -243,13 +268,17 @@
 }
 
 .hero-chapter[data-hero-chapter='anticipation'] .hero-chapter-plate {
-  inset: 0;
+  inset: var(--header) 0 0;
   background: #15100d;
 }
 
 .hero-chapter[data-hero-chapter='anticipation'] img {
   object-fit: contain;
   object-position: center;
+}
+
+.hero-chapter[data-hero-chapter='anticipation'] .hero-chapter-grade {
+  background: linear-gradient(0deg, #100906bb, transparent 39%);
 }
 
 .hero-finale {
@@ -268,7 +297,14 @@
   mix-blend-mode: screen;
 }
 
-.hero-finale-screen { overflow: clip; }
+.hero-edit-shadow {
+  z-index: 4;
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(104deg, #110b08cc, #110b084e 23%, transparent 48%);
+}
+
+.artist-hero .hero-finale-screen { top: var(--header); overflow: clip; }
 .hero-finale-screen::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(0deg, #100906bb, transparent 39%);
@@ -362,13 +398,7 @@
 }
 
 @media (max-width: 850px), (max-aspect-ratio: 5/4) {
-  .artist-hero { --hero-runway: 7.6; }
-  .artist-hero .hero-plate {
-    inset: calc(var(--header) + .35rem) 0 23%;
-    mask-image: linear-gradient(#000 0% 77%, transparent 100%);
-  }
-  .hero-plate img { object-position: center top; }
-
+  .artist-hero { --hero-runway: 5.55; }
   .hero-poster-shade {
     background: linear-gradient(0deg, #100b0be8 0%, #14100e4a 29%, transparent 64%);
   }
@@ -385,6 +415,7 @@
   .hero-strike-trace { left: 48%; top: 68%; }
   .hero-chapter-plate { inset: var(--header) 0 19%; }
   .hero-chapter-plate img { object-fit: contain; object-position: center 44%; }
+  .hero-motion-chapter .hero-chapter-plate :is(img, video) { object-position: center 44%; }
   .hero-chapter-grade { background: linear-gradient(0deg, var(--chapter-tint) 12%, transparent 62%); }
   .hero-chapter-copy { bottom: clamp(6.3rem, 15svh, 8.4rem); }
   .home .hero-chapter-copy h2 { font-size: clamp(2.5rem, 10vw, 5.65rem); }

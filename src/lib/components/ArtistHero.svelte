@@ -8,7 +8,7 @@
   import HeroRimLight from '#lib/motion/HeroRimLight.svelte';
   import { heroSequence } from '#lib/motion/hero-sequence';
   import { createCymbalAudio } from '#lib/motion/cymbal-audio';
-  import { heroChapters, notesFilm } from './hero-chapters';
+  import { heroChapters, notesFilm, performanceStart } from './hero-chapters';
   import './artist-hero.css';
 
   let { onwatch, filmBlocked }: { onwatch: (event: MouseEvent) => void; filmBlocked: boolean } = $props();
@@ -54,6 +54,22 @@
     audio.strike();
   }
 
+  const scenes = [
+    { id: 'portrait', start: 0 },
+    ...heroChapters,
+    { id: 'film', start: performanceStart },
+  ].sort((a, b) => a.start - b.start);
+
+  function nextScene() {
+    const current = scenes.findIndex(scene => scene.id === root.dataset.scene);
+    const next = scenes[current + 1];
+    if (!next) return;
+
+    const runway = root.clientHeight - window.innerHeight;
+    const top = root.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo({ top: top + Math.min(.994, next.start + .062) * runway, behavior: 'smooth' });
+  }
+
   const portraitCrop = '(max-width: 850px), (max-aspect-ratio: 5/4)';
 </script>
 
@@ -69,11 +85,11 @@
   <div class="hero-stage" data-hero-stage>
   <div class="hero-poster" data-hero-poster>
     <picture class="hero-plate" data-hero-backdrop>
-      <source media={portraitCrop} srcset="/images/hero-opening-mobile-768.webp 768w, /images/hero-opening-mobile.webp 1200w" sizes="min(100vw, 46svh)" />
+      <source media={portraitCrop} srcset="/images/hero-opening-mobile-768.webp 768w, /images/hero-opening-mobile.webp 1200w" sizes="max(100vw, 80svh)" />
       <img
         src="/images/hero-opening.webp"
         srcset="/images/hero-opening-1280.webp 1280w, /images/hero-opening.webp 3840w"
-        sizes="67vw"
+        sizes="max(100vw, 150svh)"
         alt="Sergio Bellotti behind a bronze cymbal in the studio"
         width="3840"
         height="2560"
@@ -101,15 +117,28 @@
     <section
       class="hero-chapter"
       data-hero-chapter={chapter.id}
+      class:hero-motion-chapter={chapter.motion}
       inert
       aria-labelledby={`hero-chapter-${chapter.id}`}
       style:--chapter-focus={chapter.position}
       style:--chapter-tint={chapter.tint}
     >
-      <picture class="hero-chapter-plate" data-chapter-plate>
-        {#if chapter.mobile}<source media={portraitCrop} data-srcset={chapter.mobile} />{/if}
+      <div class="hero-chapter-plate" data-chapter-plate>
         <img data-src={chapter.image.startsWith('/') ? chapter.image : `/images/${chapter.image}`} data-srcset={chapter.srcset} sizes="(max-width: 850px) 100vw, 78vw" alt="" decoding="async" />
-      </picture>
+        {#if chapter.motion}
+          <video
+            data-src={chapter.motion}
+            data-chapter-motion
+            preload="none"
+            muted
+            playsinline
+            loop
+            aria-hidden="true"
+            onplaying={(event) => { event.currentTarget.dataset.playing = 'true'; }}
+            onpause={(event) => { delete event.currentTarget.dataset.playing; }}
+          ></video>
+        {/if}
+      </div>
       <div class="hero-chapter-grade" aria-hidden="true"></div>
       <div class="hero-chapter-copy">
         <h2 class="hero-film-line" id={`hero-chapter-${chapter.id}`}><span data-chapter-line>{chapter.title}</span></h2>
@@ -147,6 +176,7 @@
   </div>
 
   <div class="hero-cut-light" data-hero-cut-light aria-hidden="true"></div>
+  <div class="hero-edit-shadow" data-hero-edit-shadow aria-hidden="true"></div>
 
   <div class="hero-meta" data-hero-details>
     <p class="hero-origin">Bari, Italy <span></span> Boston, MA</p>
@@ -155,6 +185,10 @@
   </div>
 
   <div class="hero-dock">
+    <button class="hero-scroll hero-next" type="button" onclick={nextScene}>
+      <ArrowDownIcon size={17} weight="bold" />
+      <span>Next scene</span>
+    </button>
     <a class="hero-scroll" href="#hear-the-difference">
       <ArrowDownIcon size={17} weight="bold" />
       <span>Hear the difference</span>

@@ -84,6 +84,8 @@ test('hero reveals nine chapters, plays the uncropped film, and reverses', async
   const hero = page.locator('[data-hero-sequence]');
   const poster = hero.locator('[data-hero-poster]');
   const chapters = hero.locator('[data-hero-chapter]');
+  const activeShot = chapters.and(hero.locator('[data-shot-active=true]'));
+  const discovery = hero.locator('[data-hero-chapter=discovery]');
   const film = hero.locator('[data-hero-finale]');
   const video = film.locator('video');
   const sound = hero.getByRole('button', { name: 'Unmute film' });
@@ -95,8 +97,11 @@ test('hero reveals nine chapters, plays the uncropped film, and reverses', async
 
   await expect(hero).toHaveAttribute('data-scene', 'portrait');
   await expect(poster).toHaveCSS('opacity', '1');
-  await expect(hero.locator('.hero-plate img')).toHaveCSS('object-fit', 'contain');
+  await expect(hero.locator('.hero-plate img')).toHaveCSS('object-fit', 'cover');
+  await expect(hero.locator('.hero-plate img')).toHaveCSS('object-position', '50% 0%');
   await expect(chapters).toHaveCount(7);
+  await expect(activeShot).toHaveCount(0);
+  await expect(discovery).toBeHidden();
   await page.evaluate(() => document.fonts.ready.then(() => {}));
   const nameRight = await hero.locator('.hero-name-last').evaluate((element) => element.getBoundingClientRect().right);
   expect(nameRight).toBeLessThan(720);
@@ -105,15 +110,18 @@ test('hero reveals nine chapters, plays the uncropped film, and reverses', async
   await expect(poster).toHaveCSS('opacity', '1');
 
   for (const [position, scene, title] of [
-    [.22, 'groove', 'Groove'],
-    [.33, 'control', 'Control'],
-    [.44, 'technique', 'Technique'],
-    [.55, 'flow', 'Flow'],
-    [.66, 'musicality', 'Musicality'],
-    [.77, 'anticipation', 'Before the hit'],
+    [.18, 'groove', 'Groove'],
+    [.27, 'control', 'Control'],
+    [.37, 'technique', 'Technique'],
+    [.47, 'flow', 'Flow'],
+    [.57, 'musicality', 'Musicality'],
+    [.67, 'anticipation', 'Before the hit'],
   ] as const) {
     await seek(position);
     await expect(hero).toHaveAttribute('data-scene', scene);
+    await expect(activeShot).toHaveCount(1);
+    await expect(activeShot).toHaveAttribute('data-hero-chapter', scene);
+    await expect(discovery).toBeHidden();
     await expect(hero.getByRole('heading', { name: title })).toBeVisible();
   }
   await expect(hero.locator('[data-hero-chapter="anticipation"] img'))
@@ -122,8 +130,9 @@ test('hero reveals nine chapters, plays the uncropped film, and reverses', async
   await expect(video).toHaveJSProperty('paused', true);
   await expect(sound).toHaveCount(0);
 
-  await seek(.89);
+  await seek(.92);
   await expect(hero).toHaveAttribute('data-scene', 'film');
+  await expect(discovery).toBeHidden();
   await expect(film).toHaveCSS('clip-path', 'none');
   await expect(video).toHaveCSS('object-fit', 'contain');
   await expect(sound).toBeVisible();
@@ -134,11 +143,13 @@ test('hero reveals nine chapters, plays the uncropped film, and reverses', async
 
   await seek(.99);
   await expect(hero).toHaveAttribute('data-scene', 'discovery');
+  await expect(activeShot).toHaveAttribute('data-hero-chapter', 'discovery');
   await expect(hero.getByRole('link', { name: 'Try the ghost-note comparison' })).toBeVisible();
 
   await seek(0);
   await expect(hero).toHaveAttribute('data-scene', 'portrait');
   await expect(poster).toHaveCSS('opacity', '1');
+  await expect(discovery).toBeHidden();
   await expect(film).toHaveAttribute('inert', '');
   await expect(video).toHaveJSProperty('paused', true);
 });

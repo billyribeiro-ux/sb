@@ -8,6 +8,8 @@
   --brass: #f0ba79;
   --warm-white: #fff2df;
 
+  :is(#performance-film, #hear-the-difference) { scroll-margin-block-start: var(--header); }
+
   h2 {
     margin-block: .55rem .9rem;
     font: 400 clamp(4.45rem, 8.4vw, 9.4rem)/.89 var(--display);
@@ -80,10 +82,9 @@
   .work-grid a { display: block; text-decoration: none; }
   .work-grid figure { overflow: clip; background: #302018; }
   .work-grid img {
-    width: 100%; aspect-ratio: 5 / 4; object-fit: cover; object-position: center 38%; transition: filter .35s;
+    width: 100%; aspect-ratio: 5 / 4; object-fit: contain; transition: filter .35s;
   }
   .work-grid article a:hover img { filter: brightness(1.13); }
-  .work-grid article:nth-child(2) img { object-position: center 49%; }
   .work-grid article a > div { border-bottom: 1px solid #ffffff38; padding-block: 1rem 1.35rem; }
   .work-grid h3 { font-size: clamp(1.4rem, 2.7vw, 2rem); font-weight: 540; letter-spacing: -.045em; }
   .work-grid p { margin-top: .25rem; color: #d6c5b5; }
@@ -94,9 +95,8 @@
   }
   .gallery-trigger { position: relative; overflow: clip; display: block; background: #372619; }
   .gallery-trigger:first-child { grid-row: span 2; }
-  .gallery-trigger img { width: 100%; height: 100%; object-fit: cover; transition: transform .53s; }
-  .gallery-trigger:first-child img { object-position: 46% center; }
-  .gallery-trigger:hover img, .gallery-trigger:focus-visible img { transform: scale(1.045); }
+  .gallery-trigger img { width: 100%; height: 100%; object-fit: contain; transition: filter .35s; }
+  .gallery-trigger:hover img, .gallery-trigger:focus-visible img { filter: brightness(1.10); }
   .gallery-icon {
     position: absolute; inset: auto .65rem .65rem auto;
     display: grid; place-items: center; width: 2.5rem; height: 2.5rem;
