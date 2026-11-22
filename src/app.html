@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#12110f" />
+    <link rel="icon" href="%sveltekit.assets%/favicon.svg" type="image/svg+xml" />
+    <noscript><style>
+      @media (max-width: 750px) {
+        .masthead { height: auto !important; }
+        .masthead.overlay { position: relative !important; background: #12110f !important; }
+        .masthead-inner { min-height: 4.4rem; flex-wrap: wrap; padding-block: .75rem; gap: .65rem !important; }
+        .masthead nav { display: flex !important; position: static !important; flex-wrap: wrap; padding: 0 !important; gap: 0 .9rem !important; }
+        .masthead nav a { padding: .25rem 0 !important; }
+        .masthead .nav-contact { padding-inline: .55rem !important; margin: 0; }
+        .masthead .menu-toggle { display: none !important; }
+      }
+    </style></noscript>
+    %sveltekit.head%
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>
