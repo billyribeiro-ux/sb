@@ -8,22 +8,40 @@
   import WaveformIcon from 'phosphor-svelte/lib/WaveformIcon';
   import ArtistLoader from './ArtistLoader.svelte';
   import ArtistOpening from './ArtistOpening.svelte';
-  import HeroRimLight from '#lib/motion/HeroRimLight.svelte';
-  import { heroSequence } from '#lib/motion/hero-sequence';
-  import { mountHeroPerformance } from '#lib/motion/hero-performance';
+  import HeroRimLight from './HeroRimLight.svelte';
+  import HeroDepthPortrait from './HeroDepthPortrait.svelte';
+  import { heroSequence } from './hero-sequence';
+  import { mountHeroPerformance } from './hero-performance';
   import { createCymbalAudio } from '#lib/motion/cymbal-audio';
-  import { heroChapters, heroSession } from './hero-chapters';
+  import ModalShell from '#lib/components/ModalShell.svelte';
+  import PerformanceFilm from '#lib/components/PerformanceFilm.svelte';
+  import { heroChapters, heroSession, notesFilm, type HeroOpeningEdit } from './hero-chapters';
   import './artist-hero.css';
 
-  let { onwatch, filmBlocked }: { onwatch: (event: MouseEvent) => void; filmBlocked: boolean } = $props();
+  interface Props {
+    filmOpen?: boolean;
+    comparisonHref?: string;
+    filmHref?: string;
+    openingEdit?: HeroOpeningEdit;
+  }
+
+  let {
+    filmOpen = $bindable(false),
+    comparisonHref = '#hear-the-difference',
+    filmHref = '#performance-film',
+    openingEdit,
+  }: Props = $props();
   let rootEl: HTMLElement | undefined;
   let rimLight: HeroRimLight | undefined;
+  let depthPortrait = $state<HeroDepthPortrait>();
   let audio: ReturnType<typeof createCymbalAudio> | undefined;
   let transport = $state<ReturnType<typeof mountHeroPerformance>>();
   let soundPlaying = $state(false);
-  let introOpen = $state(false);
+  let introPhase = $state<'waiting' | 'revealing'>();
+  let beginIntro: (() => void) | undefined;
   let finishIntro: (() => void) | undefined;
   let strikes = $state(0);
+  const arrivalDuration = 3600;
 
   const firstChars = [...'Sergio'].map((char, index) => ({ id: `f-${index}`, char }));
   const lastChars = [...'Bellotti'].map((char, index) => ({ id: `l-${index}`, char }));
@@ -42,41 +60,70 @@
     let sequence: ReturnType<typeof heroSequence>;
     let introTimer = 0;
     let minimumElapsed = false;
+    const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
     const playback = mountHeroPerformance(stage, video, soundtrack, (playing) => {
       soundPlaying = playing;
-      if (playing && minimumElapsed) finishIntro?.();
-    }, cutaway);
+      if (playing && minimumElapsed) beginIntro?.();
+    }, cutaway, openingEdit);
     transport = playback;
 
-    function startSequence() {
+    function startSequence(arrivedThroughIntro = false) {
+      playback.prepareOpening();
       sequence = heroSequence(node, {
         sweepCymbal,
+        openingEdit: Boolean(openingEdit),
+        arrivedThroughIntro,
+        onOpeningProgress: (progress) => {
+          if (openingEdit) playback.seekOpening(progress);
+          else depthPortrait?.seek(progress);
+        },
         onPictureChange: playback.setPictureActive,
         onCutawayChange: playback.setCutawayActive,
       });
     }
 
+    function finishIfReduced() {
+      if (motionPreference.matches) finishIntro?.();
+    }
+
     const deepLink = location.hash && location.hash !== '#top';
-    if (!deepLink && window.scrollY < 24 && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      introOpen = true;
+    if (!deepLink && window.scrollY < 24 && !motionPreference.matches) {
+      introPhase = 'waiting';
+      beginIntro = () => {
+        if (introPhase !== 'waiting') return;
+        window.clearTimeout(introTimer);
+        if (motionPreference.matches) {
+          finishIntro?.();
+          return;
+        }
+        playback.prepareOpening();
+        introPhase = 'revealing';
+        // The deadline also releases the page if a browser suspends the animation.
+        introTimer = window.setTimeout(() => finishIntro?.(), arrivalDuration + 180);
+      };
       finishIntro = () => {
+        beginIntro = undefined;
         finishIntro = undefined;
         window.clearTimeout(introTimer);
-        introOpen = false;
-        startSequence();
+        introPhase = undefined;
+        startSequence(true);
+        void tick().then(() => rootEl?.querySelector<HTMLElement>('#hero-title')?.focus({ preventScroll: true }));
       };
       introTimer = window.setTimeout(() => {
         minimumElapsed = true;
-        if (soundPlaying) finishIntro?.();
+        if (soundPlaying) beginIntro?.();
       }, 1100);
+      motionPreference.addEventListener('change', finishIfReduced);
     } else {
       startSequence();
     }
 
     return () => {
       window.clearTimeout(introTimer);
+      motionPreference.removeEventListener('change', finishIfReduced);
+      beginIntro = undefined;
       finishIntro = undefined;
-      introOpen = false;
+      introPhase = undefined;
       sequence?.destroy?.();
       playback.destroy();
       audio?.destroy();
@@ -86,13 +133,22 @@
     };
   };
 
-  $effect(() => transport?.setBlocked(filmBlocked));
+  $effect(() => transport?.setBlocked(filmOpen));
+
+  function playReel(event: MouseEvent) {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    filmOpen = true;
+  }
 
   function enterSite(withSound: boolean) {
-    if (!finishIntro) return;
+    if (introPhase !== 'waiting') return;
     transport?.setSound(withSound);
-    finishIntro();
-    void tick().then(() => rootEl?.querySelector<HTMLElement>('#hero-title')?.focus({ preventScroll: true }));
+    beginIntro?.();
+  }
+
+  function finishArrival(event: AnimationEvent) {
+    if (event.target === event.currentTarget && event.animationName === 'hero-arrival-image') finishIntro?.();
   }
 
   function strike() {
@@ -110,22 +166,26 @@
   class="artist-hero"
   data-motion-hero
   data-hero-sequence
+  data-intro-phase={introPhase}
+  style:--hero-arrival-duration={arrivalDuration + 'ms'}
+  data-opening-edit={openingEdit ? 'true' : undefined}
   {@attach mountHero}
   aria-labelledby="hero-title"
 >
   <h1 class="hero-accessible-title" id="hero-title" tabindex="-1">Sergio Bellotti</h1>
-  <ArtistLoader open={introOpen} {soundPlaying} onenter={enterSite} />
+  <ArtistLoader open={introPhase === 'waiting'} {soundPlaying} onenter={enterSite} />
   <audio data-hero-soundtrack src={heroSession.soundtrack} preload="none" loop></audio>
   <div class="hero-stage" data-hero-stage>
     <div class="hero-session" data-hero-session data-hero-video aria-hidden="true">
+      <img class="hero-session-still" src={openingEdit?.poster ?? heroSession.poster} alt="" loading="lazy" decoding="async" />
       <video
         data-hero-session-picture
-        src={heroSession.picture}
-        poster={heroSession.poster}
+        src={openingEdit?.picture ?? heroSession.picture}
+        poster={openingEdit?.poster ?? heroSession.poster}
         muted
         playsinline
         preload="none"
-        loop
+        loop={!openingEdit}
       ></video>
     </div>
     <div class="hero-flow-cutaway" data-hero-flow data-hero-video aria-hidden="true">
@@ -140,18 +200,28 @@
       ></video>
     </div>
     <div class="hero-poster" data-hero-poster>
-      <picture class="hero-plate" data-hero-backdrop>
-        <source media={portraitCrop} srcset="/images/hero-opening-mobile-768.webp 768w, /images/hero-opening-mobile.webp 1200w" sizes="max(100vw, 80svh)" />
-        <img
-          src="/images/hero-opening.webp"
-          srcset="/images/hero-opening-1280.webp 1280w, /images/hero-opening.webp 3840w"
-          sizes="max(100vw, 150svh)"
-          alt="Sergio Bellotti behind a bronze cymbal in the studio"
-          width="3840"
-          height="2560"
-          fetchpriority="high"
-        />
-      </picture>
+      <div class="hero-plate" data-hero-backdrop onanimationend={finishArrival}>
+        {#if openingEdit}
+          <picture class="hero-portrait-picture">
+            <img src={openingEdit.poster} alt="Sergio Bellotti behind a bronze cymbal in the studio"
+              width="1920" height="1080" fetchpriority="high" />
+          </picture>
+        {:else}
+          <picture class="hero-portrait-picture">
+            <source media={portraitCrop} srcset="/images/hero-opening-mobile-768.webp 768w, /images/hero-opening-mobile.webp 1200w" sizes="max(100vw, 80svh)" />
+            <img
+              src="/images/hero-opening.webp"
+              srcset="/images/hero-opening-1280.webp 1280w, /images/hero-opening.webp 3840w"
+              sizes="max(100vw, 150svh)"
+              alt="Sergio Bellotti behind a bronze cymbal in the studio"
+              width="3840"
+              height="2560"
+              fetchpriority="high"
+            />
+          </picture>
+          <HeroDepthPortrait bind:this={depthPortrait} />
+        {/if}
+      </div>
       <div class="hero-poster-shade"></div>
       <div class="hero-rim" data-hero-rim aria-hidden="true">
         <HeroRimLight bind:this={rimLight} />
@@ -164,12 +234,16 @@
       <div class="hero-poster-vignette"></div>
     </div>
     <div class="hero-name" data-hero-type>
-      <ArtistOpening />
+      <ArtistOpening arrivalDuration={introPhase === 'revealing' ? arrivalDuration : 0} />
       <span class="hero-name-first" aria-hidden="true">
-        {#each firstChars as item (item.id)}<span class="hero-char" data-hero-char>{item.char}</span>{/each}
+        {#each firstChars as item, index (item.id)}
+          <span class="hero-char" data-hero-char style:--arrival-index={index}>{item.char}</span>
+        {/each}
       </span>
       <span class="hero-name-last" aria-hidden="true">
-        {#each lastChars as item (item.id)}<span class="hero-char" data-hero-char>{item.char}</span>{/each}
+        {#each lastChars as item, index (item.id)}
+          <span class="hero-char" data-hero-char style:--arrival-index={index + firstChars.length}>{item.char}</span>
+        {/each}
       </span>
     </div>
 
@@ -196,7 +270,7 @@
           <h2 id={`hero-chapter-${chapter.id}`} data-chapter-line>{chapter.title}</h2>
           <p data-chapter-line>{chapter.copy}</p>
           {#if chapter.id === 'discovery'}
-            <a href="#hear-the-difference" data-chapter-line>Try the ghost-note comparison</a>
+            <a href={comparisonHref} data-chapter-line>Try the ghost-note comparison</a>
           {/if}
         </div>
       </section>
@@ -211,8 +285,6 @@
     </div>
 
     <div class="hero-grain" aria-hidden="true"></div>
-    <div class="hero-edit-shadow" data-hero-edit-shadow aria-hidden="true"></div>
-    <div class="hero-cut-light" data-hero-cut-light aria-hidden="true"></div>
 
     <div class="hero-meta" data-hero-details>
       <p class="hero-origin" data-hero-meta-line>Bari, Italy <span></span> Boston, MA</p>
@@ -222,7 +294,7 @@
 
     <div class="hero-dock">
       <div class="hero-dock-left">
-        <a class="hero-scroll" href="#hear-the-difference">
+        <a class="hero-scroll" href={comparisonHref}>
           <ArrowDownIcon size={17} weight="bold" />
           <span>Hear the difference</span>
         </a>
@@ -237,7 +309,7 @@
           <WaveformIcon size={19} weight="regular" />
           <span>Strike cymbal</span>
         </button>
-        <a class="hero-watch" href="#performance-film" onclick={onwatch}>
+        <a class="hero-watch" href={filmHref} onclick={playReel}>
           <PlayIcon size={15} weight="fill" />
           <span>Watch performance</span>
         </a>
@@ -245,3 +317,18 @@
     </div>
   </div>
 </section>
+
+<ModalShell open={filmOpen} title="Happy People 7/4" onclose={() => { filmOpen = false; }}>
+  {#if filmOpen}
+    <div class="hero-film-dialog">
+      <PerformanceFilm {...notesFilm} loop={false} />
+    </div>
+  {/if}
+</ModalShell>
+
+<style>
+  .hero-film-dialog {
+    width: min(100%, 118svh);
+    margin-inline: auto;
+  }
+</style>

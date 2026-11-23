@@ -2,6 +2,7 @@
   import '@fontsource-variable/geist';
   import '../app.css';
   import { afterNavigate, onNavigate } from '$app/navigation';
+  import { dev } from '$app/env';
   import { page } from '$app/state';
   import { artist, pages } from '#lib/site';
   import ListIcon from 'phosphor-svelte/lib/ListIcon';
@@ -14,7 +15,8 @@
   let expanded = $state(false);
   let menuToggle: HTMLButtonElement;
   const path = $derived(page.url.pathname.replace(/\/$/, '') || '/');
-  const home = $derived(path === '/');
+  const heroPreview = $derived(dev && path === '/hero-preview');
+  const overlay = $derived(path === '/' || heroPreview);
   const light = $derived(['/about', '/education', '/workshops'].includes(path));
 
   afterNavigate(() => { expanded = false; });
@@ -44,7 +46,7 @@
 <svelte:window onkeydown={onMenuKey} />
 <a class="skip" href="#main-content">Skip to content</a>
 <div id="top"></div>
-<header class="masthead" class:overlay={home} class:light class:expanded>
+<header class="masthead" class:overlay class:light class:expanded>
   <div class="masthead-inner shell">
     <a class="wordmark" href="/" aria-label="Sergio Bellotti home">
       <span class="brand-sticks" aria-hidden="true"></span>
@@ -75,6 +77,7 @@
   {@render children()}
 </main>
 
+{#if !heroPreview}
 <footer class="site-footer">
   <div class="shell footer-content">
     <div class="footer-lead">
@@ -98,3 +101,4 @@
     </div>
   </div>
 </footer>
+{/if}

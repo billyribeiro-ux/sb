@@ -1,3 +1,5 @@
+import type { HeroOpeningEdit } from './hero-chapters';
+
 const driftTolerance = 0.3;
 const audioFocusEvent = 'sergio:audio-focus';
 const interactiveSelector = 'a, button, input, select, textarea, label, summary, [contenteditable], [role="button"], [role="link"], [tabindex]';
@@ -10,11 +12,19 @@ export function mountHeroPerformance(
   audio: HTMLAudioElement,
   onSoundChange: (playing: boolean) => void,
   flow: HTMLVideoElement,
+  openingEdit?: HeroOpeningEdit,
 ) {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const performanceOffset = openingEdit?.handoff ?? 0;
+  let openingTime = 0;
+  let scrubbingOpening = Boolean(openingEdit);
+  let openingGain = 1;
+  let joiningPerformance = false;
+  let entered = false;
   let stageVisible = false;
   let stageRatio = 0;
   let pictureActive = false;
+  let holdingOpeningAngle = false;
   let cutawayActive = false;
   let blocked = false;
   let soundChoice: 'auto' | 'on' | 'off' = 'auto';
@@ -39,7 +49,7 @@ export function mountHeroPerformance(
 
   video.defaultMuted = true;
   video.muted = true;
-  video.preload = reducedMotion.matches ? 'none' : 'metadata';
+  updatePreload();
   flow.defaultMuted = true;
   flow.muted = true;
 
@@ -83,11 +93,16 @@ export function mountHeroPerformance(
     }).catch(() => {});
   }
 
-  function levelFromScroll() {
+  function stageLevel() {
     return Math.max(0, Math.min(1, (stageRatio - soundFadeFloor) / (fullSoundRatio - soundFadeFloor)));
   }
 
+  function levelFromScroll() {
+    return stageLevel() * (openingEdit?.soundDuringOpening && !pictureActive ? openingGain : 1);
+  }
+
   function fadeWithScroll() {
+    if (joiningPerformance) return;
     const next = levelFromScroll();
     if (next === targetLevel && fadeFrame) return;
     cancelAnimationFrame(fadeFrame);
@@ -113,11 +128,16 @@ export function mountHeroPerformance(
 
   function playSound(joinPicture = false) {
     if (!onStage() || !soundAllowed() || needsGesture || pendingSound || !audio.paused) return;
+    if (openingEdit) {
+      if (!pictureActive && (!openingEdit.soundDuringOpening || !scrubbingOpening)) return;
+      if (pictureActive && (video.paused || video.seeking ||
+          video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA)) return;
+    }
 
     if (audio.ended) {
       audio.currentTime = 0;
     } else if (joinPicture && pictureActive && !video.ended && video.readyState >= HTMLMediaElement.HAVE_METADATA) {
-      audio.currentTime = video.currentTime;
+      audio.currentTime = Math.max(0, video.currentTime - performanceOffset);
     }
 
     const request = ++soundRequest;
@@ -136,12 +156,62 @@ export function mountHeroPerformance(
   }
 
   function alignPicture() {
-    if (!pictureActive || !onStage() || reducedMotion.matches || audio.paused || audio.ended || video.seeking ||
+    if (joiningPerformance || holdingOpeningAngle || !pictureActive || !onStage() || reducedMotion.matches || audio.paused || audio.ended || video.seeking ||
         !Number.isFinite(video.duration) || video.duration <= 0) return;
 
-    const time = video.loop ? audio.currentTime % video.duration : Math.min(audio.currentTime, video.duration);
+    const length = video.duration - performanceOffset;
+    if (length <= 0) return;
+    const looping = video.loop || Boolean(openingEdit);
+    const time = performanceOffset + (looping ? audio.currentTime % length : Math.min(audio.currentTime, length));
     const drift = Math.abs(video.currentTime - time);
-    if (drift > driftTolerance && (!video.loop || video.duration - drift > driftTolerance)) video.currentTime = time;
+    if (drift > driftTolerance && (!looping || length - drift > driftTolerance)) video.currentTime = time;
+  }
+
+  function applyOpeningSeek() {
+    if (!openingEdit || pictureActive || !scrubbingOpening || video.seeking ||
+        video.readyState < HTMLMediaElement.HAVE_METADATA) return;
+    if (Math.abs(video.currentTime - openingTime) >= 0.5 / openingEdit.frameRate) {
+      video.currentTime = openingTime;
+    }
+  }
+
+  function seekOpening(progress: number) {
+    if (!openingEdit) return;
+    scrubbingOpening = progress < 1 && !reducedMotion.matches;
+    stage.toggleAttribute('data-opening-scrub', scrubbingOpening && progress > .05);
+    const lastFrame = Math.round(performanceOffset * openingEdit.frameRate) - 1;
+    const amount = Math.max(0, Math.min(1, (progress - .05) / .9));
+    openingTime = Math.round(lastFrame * amount) / openingEdit.frameRate;
+    if (openingEdit.soundDuringOpening && (scrubbingOpening || !pictureActive)) {
+      const remaining = Math.max(0, Math.min(1, (1 - progress) / .2));
+      openingGain = remaining * remaining * (3 - 2 * remaining);
+      if (!audio.paused) {
+        cancelAnimationFrame(fadeFrame);
+        fadeFrame = 0;
+        targetLevel = stageLevel() * openingGain;
+        setLevel(targetLevel);
+      }
+    }
+    applyOpeningSeek();
+  }
+
+  function showOpeningVideo() {
+    stage.toggleAttribute('data-opening-ready', Boolean(openingEdit));
+  }
+
+  function onPicturePlaying() {
+    if (joiningPerformance) {
+      joiningPerformance = false;
+      audio.currentTime = Math.max(0, video.currentTime - performanceOffset);
+      if (!audio.paused) fadeWithScroll();
+    }
+    if (audio.paused) playSound(true);
+  }
+
+  function replayPerformance() {
+    if (!openingEdit || !pictureActive || !onStage()) return;
+    video.currentTime = performanceOffset;
+    updatePicture();
   }
 
   function updatePicture() {
@@ -164,8 +234,13 @@ export function mountHeroPerformance(
     updatePicture();
   }
 
+  function updatePreload() {
+    video.preload = reducedMotion.matches ? 'none' : openingEdit && entered ? 'auto' : 'metadata';
+    flow.preload = !reducedMotion.matches && entered ? 'metadata' : 'none';
+  }
+
   function onMotionChange() {
-    video.preload = reducedMotion.matches ? 'none' : 'metadata';
+    updatePreload();
     update();
   }
 
@@ -237,13 +312,41 @@ export function mountHeroPerformance(
   audio.addEventListener('ended', onAudioEnded);
   audio.addEventListener('timeupdate', alignPicture);
   video.addEventListener('canplay', updatePicture);
+  if (openingEdit) {
+    video.addEventListener('loadedmetadata', applyOpeningSeek);
+    video.addEventListener('loadeddata', showOpeningVideo);
+    video.addEventListener('seeked', applyOpeningSeek);
+    video.addEventListener('playing', onPicturePlaying);
+    video.addEventListener('ended', replayPerformance);
+    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) showOpeningVideo();
+  }
 
   return {
-    setPictureActive(active: boolean) {
-      if (pictureActive === active) return;
+    setPictureActive(active: boolean, matchingOpening = false) {
+      if (pictureActive === active && holdingOpeningAngle === matchingOpening) return;
+      if (openingEdit && active && !pictureActive) {
+        joiningPerformance = true;
+        cancelAnimationFrame(fadeFrame);
+        fadeFrame = 0;
+        setLevel(0);
+        video.currentTime = performanceOffset;
+      } else if (!active) {
+        joiningPerformance = false;
+      }
+      if (active && matchingOpening && !pictureActive) video.currentTime = 0;
       pictureActive = active;
+      holdingOpeningAngle = matchingOpening;
       updatePicture();
+      if (openingEdit && !active && scrubbingOpening) {
+        if (!openingEdit.soundDuringOpening) pauseSound();
+        applyOpeningSeek();
+      }
     },
+    prepareOpening() {
+      entered = true;
+      updatePreload();
+    },
+    seekOpening,
     setCutawayActive(active: boolean) {
       if (cutawayActive === active) return;
       cutawayActive = active;
@@ -267,6 +370,13 @@ export function mountHeroPerformance(
       audio.removeEventListener('ended', onAudioEnded);
       audio.removeEventListener('timeupdate', alignPicture);
       video.removeEventListener('canplay', updatePicture);
+      video.removeEventListener('loadedmetadata', applyOpeningSeek);
+      video.removeEventListener('loadeddata', showOpeningVideo);
+      video.removeEventListener('seeked', applyOpeningSeek);
+      video.removeEventListener('playing', onPicturePlaying);
+      video.removeEventListener('ended', replayPerformance);
+      stage.removeAttribute('data-opening-ready');
+      stage.removeAttribute('data-opening-scrub');
       video.pause();
       flow.pause();
       pauseSound();

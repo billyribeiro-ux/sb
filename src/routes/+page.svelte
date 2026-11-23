@@ -1,15 +1,16 @@
 <script lang="ts">
-  import ArtistHero from '#lib/components/ArtistHero.svelte';
+  import ArtistHero from '#lib/hero/ArtistHero.svelte';
   import GhostNoteComparison from '../lib/components/GhostNoteComparison.svelte';
   import Cymbal from '#lib/motion/Cymbal.svelte';
   import { cinematicMotion } from '#lib/motion/cinematic-motion';
-  import ModalShell from '#lib/components/ModalShell.svelte';
   import GalleryDialog from '#lib/components/GalleryDialog.svelte';
   import PerformanceFilm from '#lib/components/PerformanceFilm.svelte';
-  import { notesFilm } from '#lib/components/hero-chapters';
+  import { notesFilm, studioOpeningEdit } from '#lib/hero/hero-chapters';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import SpotifyLogoIcon from 'phosphor-svelte/lib/SpotifyLogoIcon';
   import './home.css';
+
+  const openingEdit = { ...studioOpeningEdit, soundDuringOpening: true };
 
   let reelOpen = $state(false);
   let galleryIndex = $state<number | null>(null);
@@ -22,11 +23,6 @@
     { src: '/images/contact-portrait.webp', thumb: '/images/home-cymbal-thumb.webp', alt: 'Sergio holds a cymbal outdoors', caption: 'Away from the kit', width: 2000, height: 1334, thumbWidth: 1280, thumbHeight: 960 },
   ];
 
-  function playReel(event: MouseEvent) {
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    event.preventDefault();
-    reelOpen = true;
-  }
 </script>
 
 <svelte:head>
@@ -38,7 +34,7 @@
 </svelte:head>
 
 <div class="home" use:cinematicMotion>
-  <ArtistHero filmBlocked={reelOpen} onwatch={playReel} />
+  <ArtistHero {openingEdit} bind:filmOpen={reelOpen} />
 
   <section class="reel" id="performance-film" aria-labelledby="reel-title">
     <div class="shell reel-top" data-motion-reveal>
@@ -160,11 +156,4 @@
   </section>
 </div>
 
-<ModalShell open={reelOpen} title="Happy People 7/4" onclose={() => { reelOpen = false; }}>
-  {#if reelOpen}
-    <div class="home-film-dialog">
-      <PerformanceFilm {...notesFilm} loop={false} />
-    </div>
-  {/if}
-</ModalShell>
 <GalleryDialog bind:index={galleryIndex} items={gallery} title="From Sergio’s archive" />

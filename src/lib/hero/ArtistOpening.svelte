@@ -2,10 +2,21 @@
   import { afterNavigate } from '$app/navigation';
   import { onDestroy } from 'svelte';
 
+  let { arrivalDuration = 0 }: { arrivalDuration?: number } = $props();
   const duration = 1120;
   let running = $state(false);
   let entered = false;
   let timer: number | undefined;
+
+  function playOpening(hold = duration) {
+    if (timer !== undefined) window.clearTimeout(timer);
+    running = true;
+    timer = window.setTimeout(() => { running = false; }, hold);
+  }
+
+  $effect(() => {
+    if (arrivalDuration) playOpening(arrivalDuration + 500);
+  });
 
   afterNavigate(({ type, to }) => {
     if (entered) return;
@@ -15,8 +26,7 @@
     if (type !== 'enter' || document.hidden || window.scrollY > 4 ||
         (hash && hash !== '#top') || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-    running = true;
-    timer = window.setTimeout(() => { running = false; }, duration);
+    playOpening();
   });
 
   onDestroy(() => {
@@ -94,8 +104,8 @@
   }
 
   @keyframes settle-title {
-    from { opacity: .72; transform: translateY(.23em); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: .72; filter: blur(2px); }
+    to { opacity: 1; filter: blur(0); }
   }
 
   @keyframes settle-line {

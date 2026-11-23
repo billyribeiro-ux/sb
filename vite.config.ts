@@ -9,7 +9,7 @@ const staticExport: Adapter = {
   async adapt(builder) {
     const output = 'dist';
     for (const route of builder.routes) {
-      if (route.prerender !== true) {
+      if (route.id !== '/hero-preview' && route.prerender !== true) {
         throw new Error(`Route "${route.id}" must be prerendered for this static export.`);
       }
     }
@@ -34,4 +34,7 @@ const staticExport: Adapter = {
 
 export default defineConfig({
   plugins: [sveltekit({ adapter: staticExport })],
+  optimizeDeps: {
+    include: ['gsap', 'gsap/ScrollTrigger'],
+  },
 });

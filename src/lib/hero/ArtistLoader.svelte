@@ -51,6 +51,7 @@
     inset: 0;
     inline-size: 100%;
     block-size: 100%;
+    block-size: 100dvh;
     max-inline-size: none;
     max-block-size: none;
     padding: max(1.25rem, env(safe-area-inset-top)) 1rem max(clamp(2rem, 9svh, 6rem), env(safe-area-inset-bottom));
@@ -62,11 +63,6 @@
       radial-gradient(ellipse at 50% 41%, rgb(127 115 97 / 13%), transparent 56%),
       #0c0c0d;
     color: #f5eddf;
-    opacity: 0;
-    transition:
-      opacity 380ms ease,
-      display 380ms allow-discrete,
-      overlay 380ms allow-discrete;
   }
 
   dialog:modal {
@@ -74,12 +70,6 @@
     grid-template-rows: minmax(min-content, 1fr) auto;
     justify-items: center;
     gap: 1.75rem;
-    opacity: 1;
-    transition-duration: 180ms;
-  }
-
-  @starting-style {
-    dialog:modal { opacity: 0; }
   }
 
   dialog::backdrop { background: transparent; }
@@ -193,7 +183,6 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    dialog { transition: none; }
     dialog:modal :is(.initial span, .stroke, h2, .signature) { animation: none; }
   }
 </style>
