@@ -79,6 +79,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
     const openingStart = heroChapters[0].start;
     const editedOpening = Boolean(options.openingEdit);
     const chars = type.querySelectorAll<HTMLElement>('[data-hero-char]');
+    const sponsorItems = type.querySelectorAll<HTMLElement>('[data-hero-sponsor]');
     const metaLines = details.querySelectorAll<HTMLElement>('[data-hero-meta-line]');
     const backdropImg = backdrop.querySelector<HTMLImageElement>('img');
     const filmLines = caption.querySelectorAll<HTMLElement>('[data-hero-film-line]');
@@ -120,6 +121,16 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
             stagger: 0.032,
             clearProps: 'transform,opacity,filter',
           }, 0.08);
+        }
+        if (sponsorItems.length) {
+          intro.from(sponsorItems, {
+            y: 16,
+            autoAlpha: 0,
+            filter: 'blur(5px)',
+            duration: .7,
+            stagger: .09,
+            clearProps: 'transform,opacity,visibility,filter',
+          }, .72);
         }
         if (metaLines.length) {
           intro.from(metaLines, {
@@ -222,6 +233,10 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         .to(type, {
           y: -typeTravel, filter: 'blur(5px)', autoAlpha: 0, duration: .092, ease: 'sine.inOut',
         }, grooveCaptionStart - .053)
+        .to(sponsorItems, {
+          y: -typeTravel * .18, filter: 'blur(3px)', autoAlpha: 0,
+          duration: .055, stagger: .018, ease: 'power2.in',
+        }, grooveCaptionStart - .035)
         .to(details, {
           y: -typeTravel * .46, filter: 'blur(4px)', autoAlpha: 0, duration: .08, ease: 'sine.inOut',
         }, grooveCaptionStart - .044);

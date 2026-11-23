@@ -41,7 +41,7 @@
   let beginIntro: (() => void) | undefined;
   let finishIntro: (() => void) | undefined;
   let strikes = $state(0);
-  const arrivalDuration = 3600;
+  const arrivalDuration = 2200;
 
   const firstChars = [...'Sergio'].map((char, index) => ({ id: `f-${index}`, char }));
   const lastChars = [...'Bellotti'].map((char, index) => ({ id: `l-${index}`, char }));
@@ -239,6 +239,17 @@
           <span class="hero-char" data-hero-char style:--arrival-index={index + firstChars.length}>{item.char}</span>
         {/each}
       </span>
+      <div class="hero-sponsors" aria-label="Sponsored by Yamaha Drums and Sabian Cymbals">
+        <span class="hero-sponsor-label" data-hero-sponsor style:--sponsor-index={0}>Sponsored by</span>
+        <div class="hero-sponsor-brand" data-hero-sponsor style:--sponsor-index={1}>
+          <img class="hero-sponsor-logo hero-sponsor-logo--yamaha" src="/images/yamaha-logo.svg" alt="" width="106" height="23" />
+          <span>Drums</span>
+        </div>
+        <div class="hero-sponsor-brand" data-hero-sponsor style:--sponsor-index={2}>
+          <img class="hero-sponsor-logo hero-sponsor-logo--sabian" src="/images/sabian-logo.svg" alt="" width="82" height="25" />
+          <span>Cymbals</span>
+        </div>
+      </div>
     </div>
 
     {#each heroChapters as chapter (chapter.id)}

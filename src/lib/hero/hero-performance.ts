@@ -179,9 +179,9 @@ export function mountHeroPerformance(
   function seekOpening(progress: number) {
     if (!openingEdit) return;
     scrubbingOpening = progress < 1 && !reducedMotion.matches;
-    stage.toggleAttribute('data-opening-scrub', scrubbingOpening && progress > .05);
+    stage.toggleAttribute('data-opening-scrub', scrubbingOpening && progress > .01);
     const lastFrame = Math.round(performanceOffset * openingEdit.frameRate) - 1;
-    const amount = Math.max(0, Math.min(1, (progress - .05) / .9));
+    const amount = Math.max(0, Math.min(1, (progress - .01) / .94));
     openingTime = Math.round(lastFrame * amount) / openingEdit.frameRate;
     if (openingEdit.soundDuringOpening && (scrubbingOpening || !pictureActive)) {
       const remaining = Math.max(0, Math.min(1, (1 - progress) / .2));

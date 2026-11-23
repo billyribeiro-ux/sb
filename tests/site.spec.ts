@@ -170,7 +170,7 @@ test('the opening lets visitors enter with sound', async ({ page }) => {
   const frame = hero.locator('[data-hero-backdrop]');
   await expect(hero).toHaveAttribute('data-intro-phase', 'revealing');
   await expect(frame).toHaveCSS('animation-name', 'hero-arrival-image');
-  await expect(frame).toHaveCSS('animation-duration', '3.6s');
+  await expect(frame).toHaveCSS('animation-duration', '2.2s');
   await expect(frame).not.toHaveCSS('transform', 'none');
 
   await expect(hero).toHaveAttribute('data-cinematic', 'true');
@@ -246,6 +246,12 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
   await page.evaluate(() => document.fonts.ready.then(() => {}));
   const nameRight = await hero.locator('.hero-name-last').evaluate((element) => element.getBoundingClientRect().right);
   expect(nameRight).toBeLessThan(720);
+  const sponsors = hero.locator('.hero-sponsors');
+  await expect(sponsors).toBeVisible();
+  await expect(sponsors).toHaveAccessibleName('Sponsored by Yamaha Drums and Sabian Cymbals');
+  await expect.poll(() => sponsors.locator('img').evaluateAll((logos) =>
+    logos.every((logo) => (logo as HTMLImageElement).complete && (logo as HTMLImageElement).naturalWidth > 0)
+  )).toBe(true);
 
   await seekHero(hero, .22);
   await expect(hero).toHaveAttribute('data-scene', 'portrait');
