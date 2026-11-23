@@ -5,6 +5,7 @@
   import { artist } from '#lib/site';
   import drumCircle from './drum-circle.webp';
   import groupSession from './group-session.webp';
+  import PulseStudy from '../education/PulseStudy.svelte';
   import '../about/editorial.css';
 
   const classesPage = 'https://www.sergiobellotti.com/classes';
@@ -42,6 +43,8 @@
       credit: '2017 · Artist archive',
       width: 2000,
       height: 1502,
+      previewWidth: 768,
+      previewHeight: 576,
     },
     {
       // Official Group Lessons archive, IMG_4046.
@@ -52,6 +55,8 @@
       credit: 'Artist archive',
       width: 1700,
       height: 1278,
+      previewWidth: 1700,
+      previewHeight: 1278,
     },
     {
       // Official Group Lessons archive, DRUMCIRCLE1.
@@ -62,6 +67,8 @@
       credit: 'Artist archive',
       width: 1600,
       height: 1195,
+      previewWidth: 1600,
+      previewHeight: 1195,
     },
   ] as const;
 
@@ -142,6 +149,11 @@
     </div>
   </section>
 
+  <section class="editorial-shell clinic-practice" aria-labelledby="clinic-practice-heading">
+    <h2 id="clinic-practice-heading" data-motion-reveal>Try a clinic exercise.</h2>
+    <div data-motion-reveal><PulseStudy /></div>
+  </section>
+
   <section class="editorial-shell archive" aria-labelledby="workshop-archive">
     <div class="archive-heading" data-motion-reveal>
       <h2 id="workshop-archive">From the workshop room.</h2>
@@ -151,7 +163,14 @@
       {#each photos as photo, index (photo.src)}
         <figure data-motion-reveal>
           <a href={photo.src} aria-label={`Enlarge photograph: ${photo.caption}`} onclick={(event) => openPhoto(event, index)}>
-            <img src={photo.preview} alt={photo.alt} width={photo.width} height={photo.height} loading="lazy" decoding="async" />
+            <img
+              src={photo.preview}
+              alt={photo.alt}
+              width={photo.previewWidth}
+              height={photo.previewHeight}
+              loading="lazy"
+              decoding="async"
+            />
             <span class="enlarge" aria-hidden="true"><PlusIcon size={18} weight="bold" /></span>
           </a>
           <figcaption class="editorial-caption"><span>{photo.caption}</span><span>{photo.credit}</span></figcaption>
@@ -195,7 +214,10 @@
 
   #workshop-formats { scroll-margin-block-start: calc(var(--header, 5.45rem) + 1.5rem); }
   .format-section,
+  .clinic-practice,
   .archive { margin-block-start: clamp(4.5rem, 9vw, 9rem); }
+
+  .clinic-practice h2 { margin-block-end: 1.6rem; }
 
   .format-explorer { min-width: 0; }
   .format-choices { min-width: 0; padding: 0; margin: 0; border: 0; }
@@ -210,38 +232,37 @@
   .format-options { display: flex; flex-wrap: wrap; gap: 0.45rem; }
 
   .format-options label {
-    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
     min-width: 0;
     max-width: 100%;
-    cursor: pointer;
-  }
-
-  .format-options input {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    clip-path: inset(50%);
-    overflow: hidden;
-  }
-
-  .format-options span {
-    display: flex;
-    align-items: center;
     min-height: 2.75rem;
     padding: 0.5rem 0.8rem;
     border: 1px solid var(--editorial-rule);
     font-size: 0.875rem;
     font-weight: 650;
+    cursor: pointer;
   }
 
-  .format-options label:hover span { border-color: var(--editorial-ink); }
-  .format-options input:checked + span {
+  .format-options input {
+    flex: none;
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    accent-color: var(--editorial-accent);
+    cursor: inherit;
+  }
+
+  .format-options label:hover { border-color: var(--editorial-ink); }
+  .format-options label:has(input:checked) {
     color: var(--editorial-bg);
     border-color: var(--editorial-ink);
     background: var(--editorial-ink);
+    color-scheme: dark;
   }
 
-  .format-options input:focus-visible + span {
+  .format-options label:has(input:focus-visible) {
     outline: 2px solid var(--editorial-accent);
     outline-offset: 2px;
   }

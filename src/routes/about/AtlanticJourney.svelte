@@ -16,12 +16,12 @@
     const length = line.getTotalLength();
     let frame = 0;
 
-    function draw(progress: number) {
-      const point = line!.getPointAtLength(length * progress);
-      line!.style.strokeDashoffset = String(1 - progress);
-      tracer!.setAttribute('cx', String(point.x));
-      tracer!.setAttribute('cy', String(point.y));
-    }
+    const draw = (progress: number) => {
+      const point = line.getPointAtLength(length * progress);
+      line.style.strokeDashoffset = String(1 - progress);
+      tracer.setAttribute('cx', String(point.x));
+      tracer.setAttribute('cy', String(point.y));
+    };
 
     function play() {
       if (!motion.matches) return;
@@ -42,7 +42,7 @@
     }
 
     const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) play();
+      if (entry.intersectionRatio >= 0.4) play();
     }, { threshold: 0.4 });
 
     function updatePreference() {
@@ -94,7 +94,7 @@
             {#each meridians as x (x)}<path d={`M${x} 0V${mapHeight}`} />{/each}
             {#each parallels as y (y)}<path d={`M0 ${y}H${mapWidth}`} />{/each}
           </g>
-          <g class="coastline" fill={`url(#${id}-land)`} aria-hidden="true">
+          <g class="coastline" fill={`url(#${id}-land)`} fill-rule="evenodd" aria-hidden="true">
             {#each landPaths as path (path)}<path d={path} />{/each}
           </g>
           <text class="ocean-label" x="510" y="405" aria-hidden="true">NORTH ATLANTIC OCEAN</text>
@@ -115,7 +115,7 @@
       </div>
 
       <figcaption class="journey-caption">
-        <span>Map data <a href="https://www.naturalearthdata.com/">Natural Earth</a></span>
+        <span>Map data <a href="https://www.naturalearthdata.com/">Natural Earth</a> and <a href="https://www.geonames.org/">GeoNames</a></span>
         {#if replayRoute}
           <button type="button" onclick={replayRoute}><ArrowCounterClockwiseIcon size={16} aria-hidden="true" />Replay route</button>
         {/if}
@@ -161,7 +161,7 @@
   .pin-ring { fill: #0e1519; stroke: var(--journey-gold); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
   .pin-dot { fill: var(--journey-gold); }
   .tracer { fill: #fff4df; opacity: 0; filter: drop-shadow(0 0 7px #ffcc86); }
-  .map-frame[data-map-state='playing'] .tracer { opacity: 1; }
+  .map-frame:global([data-map-state='playing']) .tracer { opacity: 1; }
 
   .place {
     position: absolute;

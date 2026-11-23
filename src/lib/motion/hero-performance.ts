@@ -1,6 +1,8 @@
 const driftTolerance = 0.3;
 const audioFocusEvent = 'sergio:audio-focus';
 const interactiveSelector = 'a, button, input, select, textarea, label, summary, [contenteditable], [role="button"], [role="link"], [tabindex]';
+const soundFadeFloor = .08;
+const fullSoundRatio = .9;
 
 export function mountHeroPerformance(
   stage: HTMLElement,
@@ -11,6 +13,7 @@ export function mountHeroPerformance(
 ) {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let stageVisible = false;
+  let stageRatio = 0;
   let pictureActive = false;
   let cutawayActive = false;
   let blocked = false;
@@ -20,6 +23,19 @@ export function mountHeroPerformance(
   let soundPlaying = false;
   let pendingSound = false;
   let soundRequest = 0;
+  let fadeFrame = 0;
+  let targetLevel = 1;
+  let level = 1;
+  let gainContext: AudioContext | undefined;
+  let gain: GainNode | undefined;
+
+  // Some mobile browsers reserve the media element volume for hardware controls.
+  let nativeVolume = false;
+  try {
+    audio.volume = .5;
+    nativeVolume = audio.volume === .5;
+    audio.volume = 1;
+  } catch { /* Fall back to Web Audio gain when available. */ }
 
   video.defaultMuted = true;
   video.muted = true;
@@ -28,7 +44,7 @@ export function mountHeroPerformance(
   flow.muted = true;
 
   const onStage = () => stageVisible && !blocked && !document.hidden;
-  const mayPlaySound = () => onStage() && soundChoice !== 'off' &&
+  const soundAllowed = () => !blocked && !document.hidden && soundChoice !== 'off' &&
     (soundChoice === 'on' || !reducedMotion.matches);
 
   function reportSound(playing: boolean) {
@@ -38,6 +54,8 @@ export function mountHeroPerformance(
   }
 
   function pauseSound() {
+    cancelAnimationFrame(fadeFrame);
+    fadeFrame = 0;
     if (pendingSound || !audio.paused) {
       soundRequest += 1;
       pendingSound = false;
@@ -46,8 +64,55 @@ export function mountHeroPerformance(
     reportSound(false);
   }
 
+  function setLevel(value: number) {
+    level = value;
+    if (gain) gain.gain.value = value;
+    else if (nativeVolume) audio.volume = value;
+  }
+
+  function prepareGain() {
+    if (nativeVolume || gain || typeof window.AudioContext !== 'function') return;
+    const context = gainContext ??= new AudioContext();
+    void context.resume().then(() => {
+      if (gainContext !== context || gain || context.state !== 'running') return;
+      const output = context.createGain();
+      output.gain.value = level;
+      output.connect(context.destination);
+      context.createMediaElementSource(audio).connect(output);
+      gain = output;
+    }).catch(() => {});
+  }
+
+  function levelFromScroll() {
+    return Math.max(0, Math.min(1, (stageRatio - soundFadeFloor) / (fullSoundRatio - soundFadeFloor)));
+  }
+
+  function fadeWithScroll() {
+    const next = levelFromScroll();
+    if (next === targetLevel && fadeFrame) return;
+    cancelAnimationFrame(fadeFrame);
+    fadeFrame = 0;
+    targetLevel = next;
+    if (next === level) {
+      if (next === 0) pauseSound();
+      return;
+    }
+
+    const from = level;
+    const start = performance.now();
+    const duration = next < from ? 620 : 300;
+    function step(now: number) {
+      const t = Math.min(1, (now - start) / duration);
+      const easing = t * t * (3 - 2 * t);
+      setLevel(from + (next - from) * easing);
+      fadeFrame = t < 1 ? requestAnimationFrame(step) : 0;
+      if (!fadeFrame && next === 0) pauseSound();
+    }
+    fadeFrame = requestAnimationFrame(step);
+  }
+
   function playSound(joinPicture = false) {
-    if (!mayPlaySound() || needsGesture || pendingSound || !audio.paused) return;
+    if (!onStage() || !soundAllowed() || needsGesture || pendingSound || !audio.paused) return;
 
     if (audio.ended) {
       audio.currentTime = 0;
@@ -57,6 +122,8 @@ export function mountHeroPerformance(
 
     const request = ++soundRequest;
     pendingSound = true;
+    targetLevel = levelFromScroll();
+    setLevel(targetLevel);
     void audio.play().then(() => {
       if (request === soundRequest) pendingSound = false;
     }, () => {
@@ -65,6 +132,7 @@ export function mountHeroPerformance(
       needsGesture = true;
       reportSound(false);
     });
+    prepareGain();
   }
 
   function alignPicture() {
@@ -90,8 +158,9 @@ export function mountHeroPerformance(
   }
 
   function update() {
-    if (mayPlaySound()) playSound();
-    else pauseSound();
+    if (!soundAllowed()) pauseSound();
+    else if (!audio.paused) fadeWithScroll();
+    else if (stageVisible) playSound();
     updatePicture();
   }
 
@@ -101,11 +170,12 @@ export function mountHeroPerformance(
   }
 
   function onAudioPlaying() {
-    if (!mayPlaySound()) {
+    if (!soundAllowed() || stageRatio === 0) {
       pauseSound();
       return;
     }
     reportSound(true);
+    fadeWithScroll();
     alignPicture();
     document.dispatchEvent(new CustomEvent(audioFocusEvent, { detail: audio }));
   }
@@ -126,7 +196,7 @@ export function mountHeroPerformance(
   }
 
   function onFirstGesture(event: MouseEvent | KeyboardEvent) {
-    if (!needsGesture || gestureRetried || soundChoice !== 'auto' || !mayPlaySound() || !event.isTrusted ||
+    if (!needsGesture || gestureRetried || soundChoice !== 'auto' || !onStage() || !soundAllowed() || !event.isTrusted ||
         (event.target instanceof Element && event.target.closest(interactiveSelector))) return;
     if (event instanceof MouseEvent && event.button !== 0) return;
     if (event instanceof KeyboardEvent && (event.repeat || event.metaKey || event.ctrlKey || event.altKey ||
@@ -152,9 +222,10 @@ export function mountHeroPerformance(
   }
 
   const visibility = new IntersectionObserver(([entry]) => {
-    stageVisible = entry.isIntersecting && entry.intersectionRatio >= 0.55;
+    stageRatio = entry.isIntersecting ? entry.intersectionRatio : 0;
+    stageVisible = stageRatio >= .55;
     update();
-  }, { threshold: 0.55 });
+  }, { threshold: [0, soundFadeFloor, .2, .32, .44, .55, .67, .79, fullSoundRatio, 1] });
   visibility.observe(stage);
   document.addEventListener('visibilitychange', update);
   document.addEventListener(audioFocusEvent, onOtherAudio);
@@ -199,6 +270,9 @@ export function mountHeroPerformance(
       video.pause();
       flow.pause();
       pauseSound();
+      const context = gainContext;
+      gainContext = undefined;
+      void context?.close().catch(() => {});
     },
   };
 }

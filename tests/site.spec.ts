@@ -73,9 +73,10 @@ test('selects a workshop format and opens the matching clinic information', asyn
 test('replays the Bari to Boston route and shows it statically with reduced motion', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/about/');
-  const map = page.locator('[data-journey-map]');
-  const replay = map.getByRole('button', { name: 'Replay route' });
-  await expect(map.getByRole('heading', { name: 'Across the Atlantic.' })).toBeVisible();
+  const journey = page.getByRole('region', { name: 'Across the Atlantic.' });
+  const map = journey.locator('[data-journey-map]');
+  const replay = journey.getByRole('button', { name: 'Replay route' });
+  await expect(journey).toBeVisible();
   await map.scrollIntoViewIfNeeded();
   await expect(map).toHaveAttribute('data-map-state', 'complete');
   await replay.press('Enter');
@@ -83,9 +84,8 @@ test('replays the Bari to Boston route and shows it statically with reduced moti
   await expect(map).toHaveAttribute('data-map-state', 'complete');
 
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.reload();
   await expect(map).toHaveAttribute('data-map-state', 'static');
-  await expect(replay).toBeHidden();
+  await expect(replay).toHaveCount(0);
   await expect(map.getByText('Bari', { exact: true }).first()).toBeVisible();
   await expect(map.getByText('Boston', { exact: true }).first()).toBeVisible();
 });

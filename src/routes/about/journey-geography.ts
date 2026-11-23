@@ -18,9 +18,10 @@ export function project({ longitude, latitude }: Coordinates) {
   };
 }
 
+// GeoNames place records 3182351 and 4930956, respectively.
 export const cities = [
-  { name: 'Bari', region: 'Italy', longitude: 16.872, latitude: 41.117 },
-  { name: 'Boston', region: 'Massachusetts', longitude: -71.059, latitude: 42.360 },
+  { name: 'Bari', region: 'Italy', longitude: 16.86982, latitude: 41.12066 },
+  { name: 'Boston', region: 'Massachusetts', longitude: -71.05977, latitude: 42.35843 },
 ] as const;
 
 function toUnitVector({ longitude, latitude }: Coordinates): Vector {
