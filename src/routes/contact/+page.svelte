@@ -50,15 +50,13 @@
         </div>
       </div>
     </div>
-    <figure class="portrait">
-      <div class="editorial-media editorial-crop" data-motion-frame>
-        <div class="editorial-crop-image" data-motion-parallax>
-          <img
-            src="/images/contact-portrait.webp" width="2000" height="1334" srcset="/images/contact-portrait-768.webp 768w, /images/contact-portrait-1280.webp 1280w, /images/contact-portrait.webp 2000w" sizes="(max-width: 768px) 89vw, 42vw"
-            alt="Portrait of Sergio Bellotti with a gold cymbal by the rocks"
-            fetchpriority="high"
-          />
-        </div>
+    <figure class="portrait" data-motion-reveal>
+      <div class="editorial-media editorial-crop">
+        <img
+          src="/images/contact-portrait.webp" width="2000" height="1334" srcset="/images/contact-portrait-768.webp 768w, /images/contact-portrait-1280.webp 1280w, /images/contact-portrait.webp 2000w" sizes="(max-width: 768px) 89vw, 42vw"
+          alt="Portrait of Sergio Bellotti with a gold cymbal by the rocks"
+          fetchpriority="high"
+        />
       </div>
       <figcaption class="editorial-caption">Sergio Bellotti · Artist portrait</figcaption>
     </figure>
@@ -203,7 +201,7 @@
 
   .portrait {
     --crop-ratio: 5 / 4;
-    --subject-position: 34% 25%;
+    --subject-position: 34% top;
     --editorial-muted: var(--contact-muted);
     --editorial-rule: var(--contact-border);
   }

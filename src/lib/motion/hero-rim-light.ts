@@ -14,7 +14,7 @@ const fragmentSource = `
   uniform vec2 uCenter;
   uniform vec2 uPointer;
   uniform float uStrike;
-    uniform float uSweep;
+  uniform float uSweep;
 
   float gaussian(float value) { return exp(-value * value); }
 
@@ -47,11 +47,9 @@ const fragmentSource = `
     float reflection = gaussian((moving.x + moving.y * 1.16 - travel) * 17.0);
     float sweep = sin(uSweep * 3.141593) * reflection * gaussian(curve * 13.0);
     float alpha = clamp((sheen + softness * 0.145 + sweep * 0.55 + impact) * localization * underFace * rightFade * bottomFade, 0.0, 1.0);
-    vec3 amber = vec3(0.97, 0.58, 0.22);
-    vec3 gold = vec3(1.0, 0.82, 0.52);
-    vec3 light = mix(amber, gold, min(1.0, front + sweep + surge * step(0.0, uStrike)));
+    float luminance = mix(0.66, 0.84, min(1.0, front + sweep + surge * step(0.0, uStrike)));
 
-    gl_FragColor = vec4(light * alpha, alpha);
+    gl_FragColor = vec4(vec3(luminance * alpha), alpha);
   }
 `
 

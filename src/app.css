@@ -68,8 +68,8 @@ h1, h2, h3, p, figure { margin: 0; }
 .masthead.overlay {
   position: fixed; inset: 0 0 auto;
   isolation: isolate;
-  background: linear-gradient(180deg, #0e0a09f2 0%, #0e0a09d9 100%);
-  backdrop-filter: blur(18px) saturate(130%);
+  background: linear-gradient(180deg, #0c0c0cf2, #0c0c0cd9);
+  backdrop-filter: blur(18px);
   border-bottom-color: #f1d9bf38;
 }
 
@@ -78,8 +78,8 @@ h1, h2, h3, p, figure { margin: 0; }
   inset: 0;
   z-index: -1;
   overflow: hidden;
-  background: linear-gradient(180deg, #0e0a09f2 0%, #0e0a09d9 100%);
-  backdrop-filter: blur(18px) saturate(130%);
+  background: linear-gradient(180deg, #0c0c0cf2, #0c0c0cd9);
+  backdrop-filter: blur(18px);
   pointer-events: none;
 }
 .masthead-inner { display: flex; height: 100%; align-items: center; justify-content: space-between; gap: 2rem; }

@@ -22,17 +22,17 @@ const fragmentShader = `
   }
 
   void main() {
-    vec2 warm = vUv - vec2(0.91 + 0.06 * sin(uTime * 0.31), 0.77);
-    warm.x *= clamp(uAspect, 0.85, 2.4);
-    warm *= vec2(1.2, 2.25);
-    float amber = exp(-dot(warm, warm) * 1.5);
+    vec2 offset = vUv - vec2(0.91 + 0.06 * sin(uTime * 0.31), 0.77);
+    offset.x *= clamp(uAspect, 0.85, 2.4);
+    offset *= vec2(1.2, 2.25);
+    float glow = exp(-dot(offset, offset) * 1.5);
     float edge = smoothstep(0.16, 0.75, vUv.x) * smoothstep(0.03, 0.54, vUv.y);
     float breath = 0.85 + 0.15 * sin(uTime * 0.36 + 0.5);
     float grain = (filmGrain(gl_FragCoord.xy) - 0.5) * 0.028;
-    float alpha = max(0.0, amber * edge * breath * (0.3 + grain));
-    vec3 amberLight = mix(vec3(0.44, 0.25, 0.12), vec3(0.9, 0.59, 0.31), amber);
+    float alpha = max(0.0, glow * edge * breath * (0.3 + grain));
+    float luminance = mix(0.281, 0.636, glow);
 
-    gl_FragColor = vec4(amberLight * alpha, alpha);
+    gl_FragColor = vec4(vec3(luminance * alpha), alpha);
   }
 `
 

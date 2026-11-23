@@ -13,7 +13,7 @@ export function findAudioContext() {
   return window.AudioContext ?? browser.webkitAudioContext;
 }
 
-function snareStroke(context: AudioContext, accented: boolean) {
+function snareStroke(context: BaseAudioContext, accented: boolean) {
   const duration = accented ? 0.16 : 0.095;
   const volume = accented ? 0.48 : 0.11;
   const { sampleRate } = context;
@@ -36,7 +36,7 @@ function snareStroke(context: AudioContext, accented: boolean) {
   return buffer;
 }
 
-function backingStroke(context: AudioContext, instrument: 'kick' | 'hat') {
+function backingStroke(context: BaseAudioContext, instrument: 'kick' | 'hat') {
   const kick = instrument === 'kick';
   const duration = kick ? 0.22 : 0.075;
   const length = Math.ceil(duration * context.sampleRate);
@@ -60,7 +60,7 @@ function backingStroke(context: AudioContext, instrument: 'kick' | 'hat') {
   return buffer;
 }
 
-export function createPulseAudio(context: AudioContext, withBacking = false) {
+function createPulseRenderer(context: BaseAudioContext, withBacking: boolean) {
   const output = context.createGain();
   const strokes = { accent: snareStroke(context, true), ghost: snareStroke(context, false) };
   const backing = withBacking
@@ -107,5 +107,31 @@ export function createPulseAudio(context: AudioContext, withBacking = false) {
     scheduled.clear();
   }
 
-  return { context, schedule, setMuted, stop };
+  return { schedule, setMuted, stop };
+}
+
+export function createPulseAudio(context: AudioContext, withBacking = false) {
+  return { context, ...createPulseRenderer(context, withBacking) };
+}
+
+export async function renderPulseComparison(
+  sampleRate: number,
+  withoutGhostNotes: readonly PulseNote[],
+  withGhostNotes: readonly PulseNote[],
+  stepDuration: number,
+) {
+  const browser = window as Window & { webkitOfflineAudioContext?: typeof OfflineAudioContext };
+  const Offline = window.OfflineAudioContext ?? browser.webkitOfflineAudioContext;
+  if (!Offline) throw new Error('Offline audio rendering is unavailable');
+
+  const framesPerBar = Math.round(withGhostNotes.length * stepDuration * sampleRate);
+  const barDuration = framesPerBar / sampleRate;
+  const gridDuration = barDuration / withGhostNotes.length;
+  const context = new Offline(1, framesPerBar * 2, sampleRate);
+  const renderer = createPulseRenderer(context, true);
+  // Render both versions together so the backbeat and backing samples are identical.
+  renderer.schedule(withoutGhostNotes, 0, gridDuration);
+  renderer.schedule(withGhostNotes, barDuration, gridDuration);
+  const buffer = await context.startRendering();
+  return { buffer, barDuration, gridDuration };
 }

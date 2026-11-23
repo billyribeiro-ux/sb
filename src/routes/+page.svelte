@@ -8,6 +8,7 @@
   import PerformanceFilm from '#lib/components/PerformanceFilm.svelte';
   import { notesFilm } from '#lib/components/hero-chapters';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+  import SpotifyLogoIcon from 'phosphor-svelte/lib/SpotifyLogoIcon';
   import './home.css';
 
   let reelOpen = $state(false);
@@ -57,7 +58,17 @@
     </div>
     <div class="shell reel-bottom">
       <span>Studio performance</span>
-      <a href="/work/">More music &amp; sessions</a>
+      <div class="reel-links">
+        <a
+          class="reel-spotify"
+          href="https://open.spotify.com/playlist/0w6SXGwzMTXKog7xsMLEbd"
+          aria-label="Listen to me on Spotify, Sergio Bellotti on Drums playlist"
+        >
+          <SpotifyLogoIcon size={24} weight="fill" color="#1ed760" aria-hidden="true" />
+          <span>Listen to me on Spotify</span>
+        </a>
+        <a href="/work/">More music &amp; sessions</a>
+      </div>
     </div>
   </section>
 

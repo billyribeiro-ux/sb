@@ -111,14 +111,15 @@
     </div>
     <figure class="session-film" data-motion-reveal>
       <PerformanceFilm
-        src="/videos/sergio-session.mp4"
-        src4k="/videos/sergio-session-4k.mp4"
+        src="/videos/sergio-mr-d-full.mp4"
         poster="/videos/sergio-session-poster.webp"
         label="Sergio Bellotti performing Mr. D"
+        autoplay={false}
+        loop={false}
       />
       <figcaption class="editorial-caption">
         <span>Mr. D</span>
-        <span>From the studio archive</span>
+        <span>Full studio performance · 4:39</span>
       </figcaption>
     </figure>
   </section>
@@ -187,6 +188,7 @@
 
   .stage {
     --subject-position: 49% 26%;
+    --stage-shade: #121212;
     position: absolute;
     inset: 0 0 0 35%;
     aspect-ratio: auto;
@@ -199,7 +201,7 @@
     z-index: 1;
     inset: 0;
     pointer-events: none;
-    background: linear-gradient(90deg, var(--editorial-bg), transparent 47%);
+    background: linear-gradient(90deg, var(--stage-shade), transparent 47%);
   }
 
   .work-section {
@@ -297,7 +299,7 @@
     }
 
     .stage::after {
-      background: linear-gradient(0deg, var(--editorial-bg), transparent 24%);
+      background: linear-gradient(0deg, var(--stage-shade), transparent 24%);
     }
   }
 

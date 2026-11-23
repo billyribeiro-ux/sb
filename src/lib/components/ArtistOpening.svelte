@@ -51,7 +51,7 @@
     font: 670 clamp(.72rem, 1vw, .88rem)/1.3 var(--body, system-ui);
     letter-spacing: .18em;
     text-transform: uppercase;
-    text-shadow: 0 1px 12px #160a06, 0 1px 4px #160a06;
+    text-shadow: 0 1px 12px #000, 0 1px 4px #000;
     pointer-events: none;
   }
 
@@ -60,9 +60,7 @@
     z-index: -1;
     inset: -80% -20%;
     opacity: 0;
-    background:
-      linear-gradient(105deg, transparent 30%, #c1864e50 50%, transparent 68%),
-      repeating-radial-gradient(ellipse at 60% 52%, transparent 0 3px, #eeb6782b 4px 5px);
+    background: linear-gradient(105deg, transparent 30%, #ffffff32 50%, transparent 68%);
     mask-image: linear-gradient(90deg, transparent 5%, #000 41%, transparent 87%);
   }
 
@@ -76,7 +74,7 @@
 
   @media (prefers-reduced-motion: no-preference) {
     .opening[data-opening-motion='active'] .light {
-      animation: bronze-pass var(--opening-duration) cubic-bezier(.2, .65, .34, 1) both;
+      animation: light-pass var(--opening-duration) cubic-bezier(.2, .65, .34, 1) both;
     }
 
     .opening[data-opening-motion='active'] .title {
@@ -88,7 +86,7 @@
     }
   }
 
-  @keyframes bronze-pass {
+  @keyframes light-pass {
     0% { opacity: 0; transform: translateX(-60%) skewX(-14deg); }
     28% { opacity: .85; }
     75% { opacity: .38; }

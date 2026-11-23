@@ -98,8 +98,8 @@
     inset: 0;
     clip-path: inset(62% 0 0);
     background:
-      radial-gradient(ellipse 29% 10% at var(--glow-x) var(--glow-y), #ffd0904f, #e9924235 39%, transparent 84%),
-      radial-gradient(ellipse 34% 18% at var(--glow-x) calc(var(--glow-y) + 8%), transparent 59%, #e9a15621 65%, transparent 73%);
+      radial-gradient(ellipse 29% 10% at var(--glow-x) var(--glow-y), #ffffff3e, #ffffff22 39%, transparent 84%),
+      radial-gradient(ellipse 34% 18% at var(--glow-x) calc(var(--glow-y) + 8%), transparent 59%, #ffffff16 65%, transparent 73%);
     mask-image: linear-gradient(transparent 63%, #000 78%, #000 89%, transparent);
   }
 
@@ -107,7 +107,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(ellipse 12% 8% at var(--glow-x) var(--glow-y), #ffe5b0bb, #ffa75530 57%, transparent);
+    background: radial-gradient(ellipse 12% 8% at var(--glow-x) var(--glow-y), #ffffff96, #ffffff21 57%, transparent);
     opacity: var(--sweep-gain, 0);
     transform: translateX(var(--sweep-x, 0%));
   }
@@ -121,9 +121,9 @@
     inset-block-start: var(--glow-y);
     inline-size: 64%;
     block-size: 37%;
-    border: 1px solid #ffe1b4;
+    border: 1px solid #fff;
     border-radius: 50%;
-    box-shadow: 0 0 1.1rem #ffc178a0, inset 0 0 1.1rem #ffc17870;
+    box-shadow: 0 0 1.1rem #ffffff70, inset 0 0 1.1rem #ffffff50;
     animation: resonance .85s cubic-bezier(.12,.65,.4,1) both;
   }
 

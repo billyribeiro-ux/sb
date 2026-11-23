@@ -2,61 +2,19 @@ import type { Action } from 'svelte/action';
 import { heroChapters, performanceStart } from '#lib/components/hero-chapters';
 
 const motionQuery = '(prefers-reduced-motion: no-preference) and (min-height: 35rem)';
-const dissolveDur = .038;
 const openingDissolve = .048;
-const closingDissolve = .036;
+const closingDissolve = .064;
 
 export interface HeroSequenceOptions {
   sweepCymbal?: (progress: number) => void;
-  onSceneChange?: (scene: string, progress: number) => void;
+  onPictureChange?: (active: boolean) => void;
 }
 
-export type HeroSequenceInput = ((progress: number) => void) | HeroSequenceOptions;
-
-function normalizeInput(input?: HeroSequenceInput): HeroSequenceOptions {
-  if (typeof input === 'function') return { sweepCymbal: input };
-  return input ?? {};
-}
-
-function prepareChapter(chapter: HTMLElement) {
-  const image = chapter.querySelector<HTMLImageElement>('img[data-src]');
-  if (image?.dataset.src) {
-    if (image.dataset.srcset) image.srcset = image.dataset.srcset;
-    image.src = image.dataset.src;
-    image.removeAttribute('data-src');
-  }
-  const insert = chapter.querySelector<HTMLVideoElement>('video[data-src]');
-  if (insert?.dataset.src) {
-    insert.preload = 'auto';
-    insert.src = insert.dataset.src;
-    insert.removeAttribute('data-src');
-  }
-}
-
-export async function cinemaScrollTo(targetY: number) {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    window.scrollTo({ top: targetY, behavior: 'instant' });
-    return;
-  }
-  const { gsap } = await import('gsap');
-  const proxy = { y: window.scrollY };
-  gsap.to(proxy, {
-    y: targetY,
-    duration: 0.95,
-    ease: 'power3.inOut',
-    overwrite: true,
-    onUpdate: () => {
-      window.scrollTo({ top: proxy.y, behavior: 'instant' });
-    },
-  });
-}
-
-export const heroSequence: Action<HTMLElement, HeroSequenceInput | undefined> = (root, input) => {
-  let options = normalizeInput(input);
+export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, options = {}) => {
   const element = (name: string) => root.querySelector<HTMLElement>(`[data-hero-${name}]`);
-  const stage = element('stage');
   const portrait = element('poster');
   const backdrop = element('backdrop');
+  const session = element('session');
   const type = element('type');
   const details = element('details');
   const light = element('rim');
@@ -64,29 +22,16 @@ export const heroSequence: Action<HTMLElement, HeroSequenceInput | undefined> = 
   const veil = element('edit-shadow');
   const film = element('finale');
   const caption = element('finale-title');
-  const controls = element('finale-controls');
-  const shot = element('shot');
-  const meter = element('meter');
-  const bar = element('progress');
   const chapters = [...root.querySelectorAll<HTMLElement>('[data-hero-chapter]')];
-  if (!stage || !portrait || !backdrop || !type || !details || !light || !cutLight || !veil ||
-      !film || !caption || !controls || !shot || !meter || !bar || chapters.length !== heroChapters.length) return;
+  if (!portrait || !backdrop || !session || !type || !details || !light || !cutLight || !veil ||
+      !film || !caption || chapters.length !== heroChapters.length) return;
 
   const layers = {
-    stage, portrait, backdrop, type, details, light, cutLight, veil,
-    film, caption, controls, shot, meter, bar,
+    portrait, backdrop, session, type, details, light, cutLight, veil, film, caption,
   };
   const preference = window.matchMedia(motionQuery);
   let disposed = false;
-  let filmPrepared = false;
   let revert: (() => void) | undefined;
-  const requested = new Set<HTMLElement>();
-
-  function preload(chapter: HTMLElement | undefined) {
-    if (!chapter || requested.has(chapter)) return;
-    requested.add(chapter);
-    prepareChapter(chapter);
-  }
 
   async function install() {
     const [{ gsap }, { ScrollTrigger }] = await Promise.all([
@@ -96,11 +41,11 @@ export const heroSequence: Action<HTMLElement, HeroSequenceInput | undefined> = 
     if (disposed) return;
 
     const {
-      stage, portrait, backdrop, type, details, light, cutLight, veil,
-      film, caption, controls, shot, meter, bar,
+      portrait, backdrop, session, type, details, light, cutLight, veil, film, caption,
     } = layers;
     const discovery = chapters[chapters.length - 1];
     const discoveryStart = heroChapters[heroChapters.length - 1].start;
+    const discoveryImage = discovery.querySelector<HTMLImageElement>('img');
     const openingLabel = type.querySelector<HTMLElement>('[data-artist-opening]');
     const firstLine = type.querySelector<HTMLElement>('.hero-name-first');
     const lastLine = type.querySelector<HTMLElement>('.hero-name-last');
@@ -115,30 +60,11 @@ export const heroSequence: Action<HTMLElement, HeroSequenceInput | undefined> = 
 
     queries.add(motionQuery, () => {
       root.dataset.cinematic = 'true';
-      preload(chapters[0]);
       const illumination = { progress: 0 };
       const openingSweep = { progress: 0 };
-      let stageVisible = false;
-      let mediaActive = false;
-      let controlsActive = false;
+      let pictureActive = false;
       let activeChapter: HTMLElement | undefined;
-      let activeInsert: HTMLVideoElement | undefined;
-      let lastScene = '';
       let velocityDecay = 0;
-
-      function switchInsert(next?: HTMLVideoElement) {
-        if (next === activeInsert) return;
-        if (activeInsert) {
-          activeInsert.pause();
-          activeInsert.currentTime = 0;
-          activeInsert.playbackRate = 1;
-        }
-        activeInsert = next;
-        if (next) {
-          next.playbackRate = 1;
-          void next.play().catch(() => {});
-        }
-      }
 
       // Theatrical title-sequence entrance (headroom-safe scale from upper-center origin)
       let introTimeline: gsap.core.Timeline | undefined;
@@ -188,14 +114,13 @@ export const heroSequence: Action<HTMLElement, HeroSequenceInput | undefined> = 
       // Base states: smooth optical stacking, zero harsh clip-path wipes
       gsap.set(chapters, { autoAlpha: 0 });
       gsap.set(film, { autoAlpha: 0 });
+      gsap.set(session, { autoAlpha: 0 });
       gsap.set(filmLines, { yPercent: 108, autoAlpha: 0 });
-      gsap.set([controls, shot, meter], { autoAlpha: 0, y: 10 });
 
       const timeline = gsap.timeline({ paused: true, defaults: { ease: 'none' } });
 
       // Opening portrait: slow Steadicam push anchored near Sergio's eyes (zero head clip) + parting credits
       timeline
-        .to(bar, { scaleX: 1, duration: 1 }, 0)
         .to(backdrop, { scale: 1.055, duration: 0.165, ease: 'sine.inOut' }, 0.008)
         .to(illumination, { progress: 1, duration: 0.145, ease: 'sine.inOut' }, 0.028)
         .to(light, { '--hero-rim-opacity': 1.04, duration: 0.085, ease: 'sine.inOut' }, 0.055)
@@ -213,17 +138,17 @@ export const heroSequence: Action<HTMLElement, HeroSequenceInput | undefined> = 
         }, 0.112);
       }
 
-      timeline.to(portrait, { autoAlpha: 0, duration: openingDissolve, ease: 'sine.inOut' }, heroChapters[0].start);
+      timeline
+        .set(session, { autoAlpha: 1 }, heroChapters[0].start)
+        .to(portrait, { autoAlpha: 0, duration: openingDissolve, ease: 'sine.inOut' }, heroChapters[0].start);
 
       // Theatrical dip-through-darkroom optical transitions across all 7 chapters
       for (const [index, chapter] of chapters.entries()) {
-        const { start, id } = heroChapters[index];
+        const { start, id, framing } = heroChapters[index];
         const incomingLines = chapter.querySelectorAll<HTMLElement>('[data-chapter-line]');
         const plate = chapter.querySelector<HTMLElement>('[data-chapter-plate]');
         const link = chapter.querySelectorAll<HTMLElement>('[data-chapter-link]');
         const nextStart = id === 'anticipation' ? performanceStart : heroChapters[index + 1]?.start ?? 1;
-        const span = nextStart - start;
-        const fadeIn = chapter === discovery ? closingDissolve : dissolveDur;
         const captionStart = index === 0 ? start + 0.024 : start + 0.014;
 
         chapter.style.zIndex = String(10 + index);
@@ -232,7 +157,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceInput | undefined> = 
         if (id === 'groove' || chapter === discovery) {
           timeline.to(chapter, {
             autoAlpha: 1,
-            duration: fadeIn,
+            duration: chapter === discovery ? closingDissolve : openingDissolve,
             ease: 'sine.inOut',
           }, start);
         } else {
@@ -240,7 +165,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceInput | undefined> = 
             .fromTo(
               veil,
               { opacity: 0 },
-              { opacity: 0.78, duration: 0.015, ease: 'power2.in', immediateRender: false },
+              { opacity: 0.45, duration: 0.015, ease: 'power2.in', immediateRender: false },
               start - 0.015
             )
             .to(chapter, {
@@ -255,31 +180,19 @@ export const heroSequence: Action<HTMLElement, HeroSequenceInput | undefined> = 
             }, start + 0.004);
         }
 
-        // Subtle, continuous Steadicam lens drift strictly clamped <= 1.0
-        const plateDur = Math.max(0.01, Math.min(1, nextStart + dissolveDur) - start);
+        if (framing) {
+          timeline.to(session, {
+            '--session-scale': framing.scale,
+            '--session-pan': `${framing.xPercent}%`,
+            duration: 0.026,
+            ease: 'sine.out',
+          }, start);
+        }
+
         if (plate) {
-          if (id === 'anticipation') {
-            timeline.fromTo(
-              plate,
-              { scale: 1.032 },
-              { scale: 1, duration: span, ease: 'power2.out', immediateRender: false },
-              start
-            );
-          } else if (index % 2 === 0) {
-            timeline.fromTo(
-              plate,
-              { scale: 1.052 },
-              { scale: 1.005, duration: plateDur, ease: 'sine.out', immediateRender: false },
-              start
-            );
-          } else {
-            timeline.fromTo(
-              plate,
-              { scale: 1.005 },
-              { scale: 1.055, duration: plateDur, ease: 'sine.inOut', immediateRender: false },
-              start
-            );
-          }
+          timeline.fromTo(plate, { scale: 1.035 }, {
+            scale: 1, duration: 1 - start, ease: 'sine.out', immediateRender: false,
+          }, start);
         }
 
         timeline.to(incomingLines, {
@@ -311,7 +224,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceInput | undefined> = 
         }
       }
 
-      // Seamless match-cut into the uncropped 4K Happy People 7/4 performance film
+      // Open the performance back to its full frame before the closing photo.
       film.style.zIndex = '20';
       timeline
         .fromTo(
@@ -321,20 +234,16 @@ export const heroSequence: Action<HTMLElement, HeroSequenceInput | undefined> = 
           performanceStart - 0.028
         )
         .set(film, { autoAlpha: 1 }, performanceStart)
+        .to(session, { '--session-scale': 1, '--session-pan': '0%', duration: 0.035, ease: 'sine.out' }, performanceStart)
         .to(cutLight, { opacity: 0, scale: 1.12, duration: 0.048, ease: 'power2.out' }, performanceStart + 0.008)
         .to(filmLines, {
           yPercent: 0, autoAlpha: 1, duration: 0.032, stagger: 0.006, ease: 'power3.out',
         }, performanceStart + 0.020)
-        .to([shot, meter, controls], {
-          autoAlpha: 1, y: 0, duration: 0.026, stagger: 0.004, ease: 'power3.out',
-        }, performanceStart + 0.030)
         .to(filmLines, {
           yPercent: -72, autoAlpha: 0, duration: 0.024, stagger: 0.004, ease: 'power2.inOut',
         }, discoveryStart - 0.024)
-        .to([shot, meter, controls], {
-          autoAlpha: 0, y: -8, duration: 0.022, ease: 'power2.inOut',
-        }, discoveryStart - 0.024)
-        .set(film, { autoAlpha: 0 }, discoveryStart + closingDissolve);
+        .set(film, { autoAlpha: 0 }, discoveryStart + closingDissolve)
+        .set(session, { autoAlpha: 0 }, discoveryStart + closingDissolve);
 
       function sync() {
         const progress = timeline.progress();
@@ -348,10 +257,6 @@ export const heroSequence: Action<HTMLElement, HeroSequenceInput | undefined> = 
         const scene = inFilm ? 'film' : heroChapters[index]?.id ?? 'portrait';
 
         if (root.dataset.scene !== scene) root.dataset.scene = scene;
-        if (scene !== lastScene) {
-          lastScene = scene;
-          options.onSceneChange?.(scene, progress);
-        }
 
         if (activeChapter !== nextChapter) {
           if (activeChapter) {
@@ -365,39 +270,20 @@ export const heroSequence: Action<HTMLElement, HeroSequenceInput | undefined> = 
           activeChapter = nextChapter;
         }
 
-        if (stageVisible) {
-          preload(chapters[index]);
-          preload(chapters[index + 1]);
-          if (progress >= 0.55 && !filmPrepared) {
-            filmPrepared = true;
-            root.dispatchEvent(new Event('herofilmprepare'));
-          }
+        if (progress >= .6 && discoveryImage?.dataset.src) {
+          if (discoveryImage.dataset.srcset) discoveryImage.srcset = discoveryImage.dataset.srcset;
+          discoveryImage.src = discoveryImage.dataset.src;
+          discoveryImage.removeAttribute('data-src');
         }
 
-        const insert = nextChapter?.querySelector<HTMLVideoElement>('video[data-chapter-motion]');
-        const cue = index === 0 ? heroChapters[0].start + 0.016 : heroChapters[index]?.start;
-        switchInsert(stageVisible && !document.hidden && cue !== undefined && progress >= cue
-          ? insert ?? undefined : undefined);
-
-        const nextActive = stageVisible && progress >= performanceStart && progress < discoveryStart + closingDissolve;
-        const nextControls = stageVisible && inFilm && progress >= performanceStart + 0.044;
-        if (nextActive !== mediaActive) {
-          mediaActive = nextActive;
-          root.dispatchEvent(new Event(mediaActive ? 'herofilmstart' : 'herofilmstop'));
+        const nextPicture = progress >= heroChapters[0].start && progress < discoveryStart + closingDissolve;
+        if (nextPicture !== pictureActive) {
+          pictureActive = nextPicture;
+          options.onPictureChange?.(pictureActive);
         }
-        if (nextControls !== controlsActive) {
-          controlsActive = nextControls;
-          film.inert = !controlsActive;
-          film.setAttribute('aria-hidden', String(!controlsActive));
-        }
+        film.inert = !inFilm;
+        film.setAttribute('aria-hidden', String(!inFilm));
       }
-
-      const stageObserver = new IntersectionObserver(([entry]) => {
-        stageVisible = entry.intersectionRatio >= 0.55;
-        sync();
-      }, { threshold: 0.55 });
-      stageObserver.observe(stage);
-      document.addEventListener('visibilitychange', sync);
 
       timeline.eventCallback('onUpdate', () => {
         if (timeline.progress() >= 0.02) {
@@ -416,14 +302,9 @@ export const heroSequence: Action<HTMLElement, HeroSequenceInput | undefined> = 
         onUpdate: (self) => {
           const normalized = Math.max(-1, Math.min(1, self.getVelocity() / 2400));
           root.style.setProperty('--scroll-v', normalized.toFixed(3));
-          if (activeInsert && !activeInsert.paused) {
-            const boost = 1 + Math.min(0.45, Math.abs(normalized) * 0.5);
-            activeInsert.playbackRate = Number(boost.toFixed(2));
-          }
           window.clearTimeout(velocityDecay);
           velocityDecay = window.setTimeout(() => {
             root.style.setProperty('--scroll-v', '0');
-            if (activeInsert && !activeInsert.paused) activeInsert.playbackRate = 1;
           }, 140);
         },
       });
@@ -432,10 +313,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceInput | undefined> = 
       return () => {
         window.clearTimeout(velocityDecay);
         introTimeline?.kill();
-        stageObserver.disconnect();
-        document.removeEventListener('visibilitychange', sync);
-        switchInsert();
-        if (mediaActive) root.dispatchEvent(new Event('herofilmstop'));
+        options.onPictureChange?.(false);
         if (activeChapter) {
           activeChapter.inert = true;
           delete activeChapter.dataset.shotActive;
@@ -468,9 +346,6 @@ export const heroSequence: Action<HTMLElement, HeroSequenceInput | undefined> = 
   mountWhenAllowed();
 
   return {
-    update(nextInput) {
-      options = normalizeInput(nextInput);
-    },
     destroy() {
       disposed = true;
       preference.removeEventListener('change', mountWhenAllowed);

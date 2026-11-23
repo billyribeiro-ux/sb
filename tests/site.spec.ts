@@ -77,7 +77,7 @@ test('the inline opening runs on reload with navigation and Watch performance en
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
-test('hero reveals nine chapters, plays the uncropped film, and reverses', async ({ page }) => {
+test('hero keeps the session playing across chapters and holds the quiet notes before reversing', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/');
@@ -87,13 +87,25 @@ test('hero reveals nine chapters, plays the uncropped film, and reverses', async
   const activeShot = chapters.and(hero.locator('[data-shot-active=true]'));
   const discovery = hero.locator('[data-hero-chapter=discovery]');
   const film = hero.locator('[data-hero-finale]');
-  const video = film.locator('video');
-  const sound = hero.getByRole('button', { name: 'Unmute film' });
+  const picture = hero.locator('[data-hero-session-picture]');
+  const soundtrack = hero.locator('[data-hero-soundtrack]');
+  const sound = hero.getByRole('button', { name: /^(Play|Mute) soundtrack$/ });
+  const playSound = hero.getByRole('button', { name: 'Play soundtrack' });
+  const muteSound = hero.getByRole('button', { name: 'Mute soundtrack' });
+  const pictureTime = () => picture.evaluate((video: HTMLVideoElement) => video.currentTime);
   const seek = (progress: number) => hero.evaluate((element, p) => {
     const stage = element.querySelector('[data-hero-stage]')!;
     const top = element.getBoundingClientRect().top + window.scrollY;
     window.scrollTo({ top: top + (element.clientHeight - stage.clientHeight) * p, behavior: 'instant' });
   }, progress);
+  const visitChapter = async (position: number, scene: string, title: string) => {
+    await seek(position);
+    await expect(hero).toHaveAttribute('data-scene', scene);
+    await expect(activeShot).toHaveCount(1);
+    await expect(activeShot).toHaveAttribute('data-hero-chapter', scene);
+    await expect(discovery).toBeHidden();
+    await expect(hero.getByRole('heading', { name: title })).toBeVisible();
+  };
 
   await expect(hero).toHaveAttribute('data-scene', 'portrait');
   await expect(poster).toHaveCSS('opacity', '1');
@@ -102,56 +114,86 @@ test('hero reveals nine chapters, plays the uncropped film, and reverses', async
   await expect(chapters).toHaveCount(7);
   await expect(activeShot).toHaveCount(0);
   await expect(discovery).toBeHidden();
+  await expect(hero.getByRole('button', { name: 'Next scene' })).toHaveCount(0);
+  await expect(hero.getByRole('navigation', { name: 'Film chapters' })).toHaveCount(0);
+  await expect(picture).toHaveAttribute('src', '/videos/sergio-hero-session.mp4');
+  await expect(soundtrack).toHaveAttribute('src', '/videos/sergio-hero-soundtrack.m4a');
+  await expect(picture).toHaveJSProperty('paused', true);
+  await expect(picture).toHaveJSProperty('muted', true);
+  await expect(picture).toHaveJSProperty('loop', true);
+  await expect(soundtrack).toHaveJSProperty('loop', true);
+  await expect(sound).toBeVisible();
   await page.evaluate(() => document.fonts.ready.then(() => {}));
   const nameRight = await hero.locator('.hero-name-last').evaluate((element) => element.getBoundingClientRect().right);
   expect(nameRight).toBeLessThan(720);
 
   await seek(.10);
+  await expect(hero).toHaveAttribute('data-scene', 'portrait');
   await expect(poster).toHaveCSS('opacity', '1');
 
+  await visitChapter(.18, 'groove', 'Groove');
+  await expect(picture).toHaveJSProperty('paused', false);
+  await expect.poll(pictureTime).toBeGreaterThan(.8);
+  const sessionPicture = await picture.elementHandle();
+  let lastPosition = await pictureTime();
+
   for (const [position, scene, title] of [
-    [.18, 'groove', 'Groove'],
     [.27, 'control', 'Control'],
     [.37, 'technique', 'Technique'],
     [.47, 'flow', 'Flow'],
     [.57, 'musicality', 'Musicality'],
     [.67, 'anticipation', 'Before the hit'],
   ] as const) {
-    await seek(position);
-    await expect(hero).toHaveAttribute('data-scene', scene);
-    await expect(activeShot).toHaveCount(1);
-    await expect(activeShot).toHaveAttribute('data-hero-chapter', scene);
-    await expect(discovery).toBeHidden();
-    await expect(hero.getByRole('heading', { name: title })).toBeVisible();
+    await visitChapter(position, scene, title);
+    await expect(picture).toHaveJSProperty('paused', false);
+    expect(await picture.evaluate((video, original) => video === original, sessionPicture)).toBe(true);
+    const positionInFilm = await pictureTime();
+    expect(positionInFilm).toBeGreaterThanOrEqual(lastPosition - .35);
+    lastPosition = positionInFilm;
   }
-  await expect(hero.locator('[data-hero-chapter="anticipation"] img'))
-    .toHaveAttribute('src', /sergio-notes-between-poster\.webp/);
-  await expect(video).toHaveAttribute('src', /sergio-notes-between-4k/);
-  await expect(video).toHaveJSProperty('paused', true);
-  await expect(sound).toHaveCount(0);
 
-  await seek(.92);
+  await seek(.77);
   await expect(hero).toHaveAttribute('data-scene', 'film');
+  await expect(film).toHaveAttribute('aria-hidden', 'false');
   await expect(discovery).toBeHidden();
-  await expect(film).toHaveCSS('clip-path', 'none');
-  await expect(video).toHaveCSS('object-fit', 'contain');
-  await expect(sound).toBeVisible();
-  await expect(hero.getByRole('button', { name: 'Switch to HD playback' })).toBeVisible();
-  await expect(video).toHaveJSProperty('videoWidth', 3840);
-  await sound.click();
-  await expect(video).toHaveJSProperty('muted', false);
+  await expect(picture).toHaveCSS('object-fit', 'contain');
+  await expect(picture).toHaveJSProperty('paused', false);
+  expect(await picture.evaluate((video, original) => video === original, sessionPicture)).toBe(true);
+  expect(await pictureTime()).toBeGreaterThanOrEqual(lastPosition - .35);
 
-  await seek(.99);
-  await expect(hero).toHaveAttribute('data-scene', 'discovery');
-  await expect(activeShot).toHaveAttribute('data-hero-chapter', 'discovery');
-  await expect(hero.getByRole('link', { name: 'Try the ghost-note comparison' })).toBeVisible();
+  if (await muteSound.isVisible()) await muteSound.click();
+  await expect(soundtrack).toHaveJSProperty('paused', true);
+  await playSound.click();
+  await expect(muteSound).toBeVisible();
+  await expect(soundtrack).toHaveJSProperty('paused', false);
+  await expect(picture).toHaveJSProperty('muted', true);
+  await expect.poll(() => hero.evaluate((element) => {
+    const video = element.querySelector<HTMLVideoElement>('[data-hero-session-picture]')!;
+    const audio = element.querySelector<HTMLAudioElement>('[data-hero-soundtrack]')!;
+    const drift = Math.abs(video.currentTime - (audio.currentTime % video.duration));
+    return Math.min(drift, video.duration - drift);
+  })).toBeLessThanOrEqual(.45);
+  await muteSound.click();
+  await expect(playSound).toBeVisible();
+  await expect(soundtrack).toHaveJSProperty('paused', true);
+
+  for (const position of [.875, .98]) {
+    await seek(position);
+    // The scene name is already set during this hold. Let the scrubbed frame catch up.
+    if (position === .98) await page.waitForTimeout(750);
+    await expect(hero).toHaveAttribute('data-scene', 'discovery');
+    await expect(activeShot).toHaveAttribute('data-hero-chapter', 'discovery');
+    await expect(hero.getByRole('heading', { name: 'The quiet notes' })).toBeVisible();
+    await expect(hero.getByRole('link', { name: 'Try the ghost-note comparison' })).toBeVisible();
+  }
+  await expect(picture).toHaveJSProperty('paused', true);
 
   await seek(0);
   await expect(hero).toHaveAttribute('data-scene', 'portrait');
   await expect(poster).toHaveCSS('opacity', '1');
   await expect(discovery).toBeHidden();
   await expect(film).toHaveAttribute('inert', '');
-  await expect(video).toHaveJSProperty('paused', true);
+  await expect(picture).toHaveJSProperty('paused', true);
 });
 
 test('cymbal responds to a keyboard strike with the graphical fallback available', async ({ page }) => {
@@ -171,6 +213,10 @@ test('film sound is opt-in on both performance reels', async ({ page }) => {
     await expect(film).toHaveJSProperty('paused', true);
     await page.getByRole('button', { name: 'Unmute film' }).click();
     await expect(film).toHaveJSProperty('muted', false);
+    if (path === '/work/') {
+      await expect(film).toHaveAttribute('src', '/videos/sergio-mr-d-full.mp4');
+      await expect.poll(() => film.evaluate((video: HTMLVideoElement) => video.duration)).toBeCloseTo(279.33, 1);
+    }
     await expect(page.getByRole('button', { name: 'Mute film' })).toBeVisible();
     await page.getByRole('button', { name: 'Mute film' }).click();
     await expect(film).toHaveJSProperty('muted', true);

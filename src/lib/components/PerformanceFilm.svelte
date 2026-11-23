@@ -5,24 +5,20 @@
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import SpeakerSlashIcon from 'phosphor-svelte/lib/SpeakerSlashIcon';
 
-  let { src, src4k, poster, label, active = true, prepared = false, heroMode = false,
-    autoplay = true, loop = true, ontime }: {
+  let { src, src4k, poster, label, active = true, autoplay = true, loop = true }: {
     src: string;
     src4k?: string;
     poster: string;
     label: string;
     active?: boolean;
-    prepared?: boolean;
-    heroMode?: boolean;
     autoplay?: boolean;
     loop?: boolean;
-    ontime?: (time: number) => void;
   } = $props();
   let video: HTMLVideoElement;
   let paused = $state(true);
   let muted = $state(true);
   let quality = $state<'hd' | '4k'>('hd');
-  const mediaSource = $derived(heroMode && !prepared && !active ? undefined : quality === '4k' ? src4k ?? src : src);
+  const mediaSource = $derived(quality === '4k' ? src4k ?? src : src);
   let switchPlayback: { time: number; wasPlaying: boolean } | undefined;
   let prohibitedAutoplay = false;
   let manualPlay = false;
@@ -71,16 +67,7 @@
 
   $effect(() => {
     if (active) update();
-    else if (video) {
-      video.pause();
-      if (heroMode) {
-        video.currentTime = 0;
-        prohibitedAutoplay = false;
-        manualPlay = false;
-        video.muted = true;
-        muted = true;
-      }
-    }
+    else video?.pause();
   });
 
   function claimPlayback() {
@@ -126,7 +113,7 @@
   }
 </script>
 
-<div class="film-player" class:hero-mode={heroMode}>
+<div class="film-player">
   <video
     bind:this={video}
     src={mediaSource}
@@ -135,15 +122,14 @@
     {muted}
     playsinline
     {loop}
-    preload={heroMode && prepared ? 'auto' : 'none'}
+    preload="none"
     onloadedmetadata={restorePlayback}
     oncanplay={() => update()}
     onplay={() => { paused = false; claimPlayback(); }}
     onended={() => { prohibitedAutoplay = true; manualPlay = false; }}
     onpause={() => { paused = true; }}
-    ontimeupdate={() => ontime?.(video.currentTime)}
   ></video>
-  <div class="film-controls" inert={!heroMode && !active} data-hero-finale-controls={heroMode ? true : undefined}>
+  <div class="film-controls" inert={!active}>
     {#if src4k}
       <button type="button" class="quality" onclick={toggleQuality}
         aria-label={quality === '4k' ? 'Switch to HD playback' : 'Switch to 4K upscale'}
@@ -175,12 +161,6 @@
   }
   button:hover, a:hover { background: #3a2718; }
   .quality { font-weight: 720; min-width: 2.75rem; }
-  .film-player.hero-mode { height: 100%; width: 100%; }
-  .hero-mode video { object-fit: contain; object-position: center; }
-  .hero-mode .film-controls { bottom: clamp(4.7rem, 11vh, 6.8rem); right: var(--gutter); z-index: 3; }
-  @media (max-width: 850px), (max-aspect-ratio: 5/4) {
-    .hero-mode video { object-position: 50% 42%; }
-  }
   @media (max-width: 600px) {
     .film-controls, noscript a { inset: auto .5rem .5rem auto; }
   }

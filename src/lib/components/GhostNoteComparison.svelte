@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { createPulseAudio, findAudioContext, pulseBeats, pulseTempo } from '../audio/pulse-audio';
+  import { findAudioContext, pulseBeats, pulseTempo, renderPulseComparison } from '../audio/pulse-audio';
 
   const versions = [
     { id: 'without', label: 'Without ghost notes' },
@@ -22,7 +22,9 @@
   let playing = $state<Version | null>(null);
   let currentStep = $state<number | null>(null);
   let audioIssue = $state(false);
-  let audio: ReturnType<typeof createPulseAudio> | undefined;
+  let audio: AudioContext | undefined;
+  let groove: ReturnType<typeof renderPulseComparison> | undefined;
+  let source: AudioBufferSourceNode | undefined;
   let frame: number | undefined;
   let playbackId = 0;
 
@@ -30,7 +32,11 @@
     playbackId += 1;
     if (frame !== undefined) cancelAnimationFrame(frame);
     frame = undefined;
-    audio?.stop();
+    if (source) {
+      source.stop();
+      source.disconnect();
+      source = undefined;
+    }
     playing = null;
     currentStep = null;
   }
@@ -52,9 +58,13 @@
     playing = version;
 
     try {
-      audio ??= createPulseAudio(new Audio(), true);
-      const { context } = audio;
-      await context.resume();
+      const context = audio ??= new Audio();
+      const resumed = context.resume();
+      groove ??= renderPulseComparison(context.sampleRate, patterns.without, patterns.with, stepDuration).catch((error: unknown) => {
+        groove = undefined;
+        throw error;
+      });
+      const [{ buffer, barDuration, gridDuration }] = await Promise.all([groove, resumed]);
       if (id !== playbackId) return;
       if (context.state !== 'running') {
         stop();
@@ -63,18 +73,25 @@
       }
 
       document.dispatchEvent(new CustomEvent<Element>('sergio:audio-focus', { detail: root }));
-      const notes = patterns[version];
       const start = context.currentTime + 0.045;
-      audio.schedule(notes, start, stepDuration);
+      const barStart = version === 'with' ? barDuration : 0;
+      const loop = context.createBufferSource();
+      loop.buffer = buffer;
+      loop.loop = true;
+      loop.loopStart = barStart;
+      loop.loopEnd = barStart + barDuration;
+      loop.connect(context.destination);
+      loop.start(start, barStart);
+      source = loop;
 
       function draw() {
-        const step = Math.floor((context.currentTime - start) / stepDuration);
-        if (context.state !== 'running' || step >= notes.length) {
+        if (context.state !== 'running') {
           stop();
           return;
         }
 
-        currentStep = step < 0 ? null : step;
+        const step = Math.floor((context.currentTime - start) / gridDuration);
+        currentStep = step < 0 ? null : step % withGhostNotes.length;
         frame = requestAnimationFrame(draw);
       }
 
@@ -94,7 +111,7 @@
     function onVisibilityChange() {
       if (!document.hidden) return;
       stop();
-      if (audio) void audio.context.suspend().catch(() => {});
+      if (audio) void audio.suspend().catch(() => {});
     }
 
     document.addEventListener('sergio:audio-focus', onAudioFocus);
@@ -103,7 +120,7 @@
       document.removeEventListener('sergio:audio-focus', onAudioFocus);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       stop();
-      if (audio) void audio.context.close().catch(() => {});
+      if (audio) void audio.close().catch(() => {});
     };
   });
 </script>
@@ -117,7 +134,7 @@
     </div>
 
     <div class="study">
-      <p class="study-meta">Synthesized drum exercise <span>{pulseTempo} BPM · one bar</span></p>
+      <p class="study-meta">Synthesized drum exercise <span>{pulseTempo} BPM · Loop</span></p>
       <div class="pattern" aria-hidden="true">
         {#each pulseBeats as beat, index (index)}
           <div class="beat">

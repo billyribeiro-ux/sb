@@ -35,6 +35,15 @@
     font-size: .875rem;
   }
   .reel-bottom a { font-weight: 620; text-underline-offset: .35em; }
+  .reel-links { display: flex; flex-wrap: wrap; align-items: center; gap: .55rem 1rem; }
+  .reel-spotify {
+    display: inline-flex; align-items: center; gap: .45rem;
+    min-block-size: 2.75rem; padding: .4rem .75rem;
+    color: var(--warm-white); border: 1px solid #1ed76073; border-radius: 999px;
+    text-decoration: none;
+  }
+  .reel-spotify:hover { border-color: #1ed760; background: #1ed76016; }
+  .reel-spotify:focus-visible { outline-color: #1ed760; }
 
   .intro, .archive { padding-block: clamp(4.2rem, 9vw, 9rem); background: var(--paper); }
   .intro-grid {
