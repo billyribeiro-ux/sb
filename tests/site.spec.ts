@@ -246,20 +246,32 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
   await page.evaluate(() => document.fonts.ready.then(() => {}));
   const nameRight = await hero.locator('.hero-name-last').evaluate((element) => element.getBoundingClientRect().right);
   expect(nameRight).toBeLessThan(720);
-  const sponsors = hero.locator('.hero-sponsors');
-  await expect(sponsors).toBeVisible();
-  await expect(sponsors).toHaveAccessibleName('Sponsored by Yamaha Drums and Sabian Cymbals');
-  await expect.poll(() => sponsors.locator('img').evaluateAll((logos) =>
+  const sponsorScenes = hero.locator('[data-hero-sponsor-scene]');
+  const sabian = hero.locator('[data-hero-sponsor-scene="sabian"]');
+  const yamaha = hero.locator('[data-hero-sponsor-scene="yamaha"]');
+  await expect(sponsorScenes).toHaveCount(2);
+  await expect(sabian).toBeHidden();
+  await expect(yamaha).toBeHidden();
+  await expect.poll(() => sponsorScenes.locator('img').evaluateAll((logos) =>
     logos.every((logo) => (logo as HTMLImageElement).complete && (logo as HTMLImageElement).naturalWidth > 0)
   )).toBe(true);
 
+  await seekHero(hero, .12);
+  await expect(sabian).toBeVisible();
+  await expect(yamaha).toBeHidden();
+
   await seekHero(hero, .22);
+  await expect(sabian).toBeHidden();
   await expect(hero).toHaveAttribute('data-scene', 'portrait');
   await expect(poster).toHaveCSS('opacity', '1');
   await expect(hero.locator('[data-hero-session]')).toBeVisible();
   await expect(picture).toHaveCSS('opacity', '1');
   await expect(picture).toHaveJSProperty('paused', true);
   await expect.poll(pictureTime).toBeGreaterThan(3);
+
+  await seekHero(hero, .32);
+  await expect(yamaha).toBeVisible();
+  await expect(sabian).toBeHidden();
 
   await visitChapter(.34, 'groove', 'Groove');
   await expect(picture).toHaveCSS('opacity', '1');
@@ -279,6 +291,7 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
     [.73, 'anticipation', 'Before the hit'],
   ] as const) {
     await visitChapter(position, scene, title);
+    if (scene === 'control') await expect(yamaha).toBeHidden();
     if (scene === 'flow') {
       await expect(flowPicture).toHaveJSProperty('paused', false);
       await expect.poll(() => flowPicture.evaluate((video: HTMLVideoElement) => video.currentTime)).toBeGreaterThan(.1);
@@ -396,6 +409,8 @@ test('explicit hero sound works with reduced motion and static chapters', async 
   const soundtrack = page.locator('[data-hero-soundtrack]');
   await expect(page.getByRole('heading', { name: 'Seven movements. One performance.' })).toBeVisible();
   await expect(page.locator('.hero-static-chapter')).toHaveCount(7);
+  await expect(page.locator('.hero-static-sponsors')).toHaveAccessibleName('Sponsored by Yamaha Drums and Sabian Cymbals');
+  await expect(page.locator('.hero-static-sponsors img')).toHaveCount(2);
   await page.getByRole('button', { name: 'Play soundtrack' }).click();
   await expect(page.getByRole('button', { name: 'Mute soundtrack' })).toBeVisible();
   await expect(soundtrack).toHaveJSProperty('paused', false);

@@ -79,7 +79,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
     const openingStart = heroChapters[0].start;
     const editedOpening = Boolean(options.openingEdit);
     const chars = type.querySelectorAll<HTMLElement>('[data-hero-char]');
-    const sponsorItems = type.querySelectorAll<HTMLElement>('[data-hero-sponsor]');
+    const sponsorScenes = root.querySelectorAll<HTMLElement>('[data-hero-sponsor-scene]');
     const metaLines = details.querySelectorAll<HTMLElement>('[data-hero-meta-line]');
     const backdropImg = backdrop.querySelector<HTMLImageElement>('img');
     const filmLines = caption.querySelectorAll<HTMLElement>('[data-hero-film-line]');
@@ -122,16 +122,6 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
             clearProps: 'transform,opacity,filter',
           }, 0.08);
         }
-        if (sponsorItems.length) {
-          intro.from(sponsorItems, {
-            y: 16,
-            autoAlpha: 0,
-            filter: 'blur(5px)',
-            duration: .7,
-            stagger: .09,
-            clearProps: 'transform,opacity,visibility,filter',
-          }, .72);
-        }
         if (metaLines.length) {
           intro.from(metaLines, {
             y: 14,
@@ -155,6 +145,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         }, 0.16);
       }
 
+      gsap.set(sponsorScenes, { autoAlpha: 0 });
       gsap.set(chapters, { autoAlpha: 0 });
       gsap.set(film, { autoAlpha: 0 });
       gsap.set(session, { autoAlpha: 0, ...framingStyles(widePerformanceFraming) });
@@ -206,7 +197,98 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         }
       }
 
+      function sponsorMoment(id: string, start: number, settled: number, exitStart: number, end: number) {
+        const scene = root.querySelector<HTMLElement>(`[data-hero-sponsor-scene="${id}"]`);
+        const atmosphere = root.querySelector<HTMLElement>('[data-hero-sponsor-atmosphere]');
+        const frame = root.querySelector<HTMLElement>('[data-hero-stage]');
+        const connector = scene?.querySelector<HTMLElement>('.hero-sponsor-connector');
+        const descriptor = scene?.querySelector<HTMLElement>('.hero-sponsor-descriptor');
+        const echo = scene?.querySelector<HTMLElement>('.hero-sponsor-echo');
+        const shockwave = scene?.querySelector<HTMLElement>('.hero-sponsor-shockwave');
+        const flare = scene?.querySelector<HTMLElement>('.hero-sponsor-flare');
+        if (!scene) return;
+        const entrance = settled - start;
+        const exit = end - exitStart;
+        const direction = id === 'sabian' ? 1 : -1;
+        const originX = frame
+          ? id === 'sabian'
+            ? frame.clientWidth - scene.offsetLeft + scene.offsetWidth * .5
+            : frame.clientWidth * .5 - (scene.offsetLeft + scene.offsetWidth * .5)
+          : 0;
+        const originY = frame
+          ? id === 'sabian'
+            ? scene.offsetHeight * .15
+            : frame.clientHeight * .46 - (scene.offsetTop + scene.offsetHeight * .5)
+          : 0;
+        opticalCue(settled - .012, .38);
+        if (atmosphere) {
+          timeline.fromTo(atmosphere,
+            { autoAlpha: 0 },
+            { autoAlpha: .96, duration: entrance * .72, ease: 'sine.inOut', immediateRender: false },
+            start,
+          ).to(atmosphere, { autoAlpha: 0, duration: exit, ease: 'power2.in' }, exitStart);
+        }
+        timeline.fromTo(scene,
+          { autoAlpha: 0, filter: 'blur(12px)' },
+          { autoAlpha: 1, filter: 'blur(0px)', duration: entrance, ease: 'sine.inOut', immediateRender: false },
+          start,
+        ).fromTo(scene,
+          {
+            scale: 4.2, x: originX, y: originY, rotation: -4 * direction,
+            rotationY: -16 * direction, transformPerspective: 1200,
+          },
+          {
+            scale: 1, x: 0, y: 0, rotation: 0, rotationY: 0,
+            duration: entrance, ease: 'power2.inOut', immediateRender: false,
+          },
+          start,
+        ).to(scene, { scale: 1.025, duration: exitStart - settled, ease: 'sine.inOut' }, settled)
+        .to(scene, {
+          autoAlpha: 0, scale: .35, x: -80 * direction, y: 24,
+          rotationY: 28 * direction, filter: 'blur(12px)', duration: exit, ease: 'power3.in',
+        }, exitStart);
+        if (echo) {
+          timeline.fromTo(echo,
+            { autoAlpha: .7, scale: 1, filter: 'blur(0px)' },
+            { autoAlpha: 0, scale: 1.65, filter: 'blur(8px)', duration: entrance * .65, ease: 'power2.out', immediateRender: false },
+            settled - entrance * .18,
+          );
+        }
+        if (shockwave) {
+          timeline.fromTo(shockwave,
+            { autoAlpha: .85, scale: .3 },
+            { autoAlpha: 0, scale: 2.1, duration: entrance * .75, ease: 'power2.out', immediateRender: false },
+            settled - entrance * .15,
+          );
+        }
+        if (descriptor) {
+          timeline.fromTo(descriptor,
+            { autoAlpha: 0, y: 12, letterSpacing: '.9em' },
+            { autoAlpha: 1, y: 0, letterSpacing: '.42em', duration: entrance * .55, ease: 'power3.out', immediateRender: false },
+            settled - entrance * .35,
+          );
+        }
+        if (connector) {
+          timeline.fromTo(connector,
+            { scaleX: 0, autoAlpha: 0, transformOrigin: '100% 50%' },
+            { scaleX: 1, autoAlpha: 1, duration: entrance * .55, ease: 'power2.out', immediateRender: false },
+            settled - entrance * .45,
+          ).to(connector, {
+            scaleX: 0, autoAlpha: 0, duration: exit * .6, ease: 'power2.in',
+          }, exitStart);
+        }
+        if (flare) {
+          timeline.fromTo(flare,
+            { xPercent: -170, autoAlpha: 0 },
+            { xPercent: 170, autoAlpha: 1, duration: entrance * .65, ease: 'power2.inOut', immediateRender: false },
+            settled - entrance * .65,
+          ).to(flare, { autoAlpha: 0, duration: entrance * .2 }, settled);
+        }
+      }
+
       if (editedOpening) {
+        sponsorMoment('sabian', .035, .115, .173, .215);
+        sponsorMoment('yamaha', .278, .326, .338, .356);
         // The pullback and first performance angle are frames of the same edit.
         timeline
           .set(session, { autoAlpha: 1, '--session-live-opacity': 1, '--session-shade': 0 }, 0)
@@ -233,10 +315,6 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         .to(type, {
           y: -typeTravel, filter: 'blur(5px)', autoAlpha: 0, duration: .092, ease: 'sine.inOut',
         }, grooveCaptionStart - .053)
-        .to(sponsorItems, {
-          y: -typeTravel * .18, filter: 'blur(3px)', autoAlpha: 0,
-          duration: .055, stagger: .018, ease: 'power2.in',
-        }, grooveCaptionStart - .035)
         .to(details, {
           y: -typeTravel * .46, filter: 'blur(4px)', autoAlpha: 0, duration: .08, ease: 'sine.inOut',
         }, grooveCaptionStart - .044);

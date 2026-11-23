@@ -239,16 +239,27 @@
           <span class="hero-char" data-hero-char style:--arrival-index={index + firstChars.length}>{item.char}</span>
         {/each}
       </span>
-      <div class="hero-sponsors" aria-label="Sponsored by Yamaha Drums and Sabian Cymbals">
-        <span class="hero-sponsor-label" data-hero-sponsor style:--sponsor-index={0}>Sponsored by</span>
-        <div class="hero-sponsor-brand" data-hero-sponsor style:--sponsor-index={1}>
-          <img class="hero-sponsor-logo hero-sponsor-logo--yamaha" src="/images/yamaha-logo.svg" alt="" width="106" height="23" />
-          <span>Drums</span>
-        </div>
-        <div class="hero-sponsor-brand" data-hero-sponsor style:--sponsor-index={2}>
-          <img class="hero-sponsor-logo hero-sponsor-logo--sabian" src="/images/sabian-logo.svg" alt="" width="82" height="25" />
-          <span>Cymbals</span>
-        </div>
+    </div>
+
+    <div class="hero-sponsor-atmosphere" data-hero-sponsor-atmosphere aria-hidden="true"><span></span><span></span></div>
+    <div class="hero-sponsor-scene hero-sponsor-scene--sabian" data-hero-sponsor-scene="sabian">
+      <span class="hero-sponsor-connector" aria-hidden="true"></span>
+      <div class="hero-sponsor-lockup">
+        <img class="hero-sponsor-echo hero-sponsor-logo--sabian" src="/images/sabian-logo.svg" alt="" aria-hidden="true" width="208" height="64" />
+        <span class="hero-sponsor-shockwave" aria-hidden="true"></span>
+        <img class="hero-sponsor-logo hero-sponsor-logo--sabian" src="/images/sabian-logo.svg" alt="Sabian" width="208" height="64" />
+        <span class="hero-sponsor-descriptor">Cymbals</span>
+        <span class="hero-sponsor-flare" aria-hidden="true"></span>
+      </div>
+    </div>
+    <div class="hero-sponsor-scene hero-sponsor-scene--yamaha" data-hero-sponsor-scene="yamaha">
+      <span class="hero-sponsor-connector" aria-hidden="true"></span>
+      <div class="hero-sponsor-lockup">
+        <img class="hero-sponsor-echo hero-sponsor-logo--yamaha" src="/images/yamaha-logo.svg" alt="" aria-hidden="true" width="224" height="49" />
+        <span class="hero-sponsor-shockwave" aria-hidden="true"></span>
+        <img class="hero-sponsor-logo hero-sponsor-logo--yamaha" src="/images/yamaha-logo.svg" alt="Yamaha" width="224" height="49" />
+        <span class="hero-sponsor-descriptor">Drums</span>
+        <span class="hero-sponsor-flare" aria-hidden="true"></span>
       </div>
     </div>
 
@@ -347,6 +358,11 @@
     <div class="hero-static-heading">
       <p>The Notes Between</p>
       <h2 id="hero-static-title">Seven movements.<br />One performance.</h2>
+      <div class="hero-static-sponsors" aria-label="Sponsored by Yamaha Drums and Sabian Cymbals">
+        <span>Sponsored by</span>
+        <img src="/images/yamaha-logo.svg" alt="Yamaha Drums" width="112" height="24" />
+        <img src="/images/sabian-logo.svg" alt="Sabian Cymbals" width="112" height="35" />
+      </div>
     </div>
     {#each heroChapters as chapter, index (chapter.id)}
       <article class="hero-static-chapter">
