@@ -1,5 +1,6 @@
 <script lang="ts">
   import { cinematicMotion } from '#lib/motion/cinematic-motion';
+  import AtlanticJourney from './AtlanticJourney.svelte';
   import './editorial.css';
 
   const milestones = [
@@ -56,6 +57,8 @@
       </figcaption>
     </figure>
   </div>
+
+  <AtlanticJourney />
 
   <section class="editorial-shell biography" aria-labelledby="biography-heading">
     <div class="biography-intro" data-motion-reveal>

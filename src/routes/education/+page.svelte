@@ -13,8 +13,8 @@
     {
       title: 'Group workshops',
       summary: 'Hands-on sessions for schools, ensembles, and community groups. Formats include group classes, percussion clinics, and drum circles.',
-      href: 'mailto:sergiobellotti@gmail.com?subject=Percussion%20workshop%20inquiry',
-      label: 'Discuss a workshop'
+      href: '/workshops/',
+      label: 'Explore group workshops'
     },
     {
       title: 'Masterclasses',

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { artist } from '#lib/site';
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
 
   interface Props {
@@ -29,7 +30,8 @@
       <span class="stroke"></span>
       <span class="initial"><span>B</span></span>
     </div>
-    <h2 id={titleId}>Sergio Bellotti</h2>
+    <h2 id={titleId}>{artist.name}</h2>
+    <p class="signature">{artist.tagline}</p>
   </div>
 
   <div class="actions">
@@ -121,10 +123,17 @@
     text-transform: uppercase;
   }
 
+  .signature {
+    color: var(--loader-accent);
+    font: 620 clamp(.8rem, 1.8vw, 1.05rem)/1.25 var(--body);
+    letter-spacing: .2em;
+  }
+
   dialog:modal .initial span { animation: loader-rise 880ms var(--loader-ease) 70ms both; }
   dialog:modal .initial:last-child span { animation-delay: 170ms; }
   dialog:modal .stroke { animation: loader-stroke 760ms var(--loader-ease) 110ms both; }
   dialog:modal h2 { animation: loader-title 640ms var(--loader-ease) 360ms both; }
+  dialog:modal .signature { animation: loader-title 470ms var(--loader-ease) 490ms both; }
 
   @keyframes loader-rise {
     from { opacity: 0.15; transform: translateY(108%); }
@@ -185,6 +194,6 @@
 
   @media (prefers-reduced-motion: reduce) {
     dialog { transition: none; }
-    dialog:modal :is(.initial span, .stroke, h2) { animation: none; }
+    dialog:modal :is(.initial span, .stroke, h2, .signature) { animation: none; }
   }
 </style>

@@ -4,6 +4,7 @@ import { heroChapters, performanceStart, widePerformanceFraming, type HeroFramin
 const motionQuery = '(prefers-reduced-motion: no-preference) and (min-height: 35rem)';
 const openingDissolve = .048;
 const closingDissolve = .064;
+const captionFadeOut = .032;
 
 function framingStyles(framing: HeroFraming) {
   return {
@@ -57,14 +58,11 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
     const discovery = chapters[chapters.length - 1];
     const discoveryStart = heroChapters[heroChapters.length - 1].start;
     const discoveryImage = discovery.querySelector<HTMLImageElement>('img');
-    const openingLabel = type.querySelector<HTMLElement>('[data-artist-opening]');
-    const firstLine = type.querySelector<HTMLElement>('.hero-name-first');
-    const lastLine = type.querySelector<HTMLElement>('.hero-name-last');
+    const openingStart = heroChapters[0].start;
     const chars = type.querySelectorAll<HTMLElement>('[data-hero-char]');
     const metaLines = details.querySelectorAll<HTMLElement>('[data-hero-meta-line]');
     const backdropImg = backdrop.querySelector<HTMLImageElement>('img');
-    const filmWords = [...caption.querySelectorAll<HTMLElement>('[data-hero-film-word]')];
-    const filmLines = [...caption.querySelectorAll<HTMLElement>('[data-hero-film-line]')];
+    const filmLines = caption.querySelectorAll<HTMLElement>('[data-hero-film-line]');
 
     gsap.registerPlugin(ScrollTrigger);
     const queries = gsap.matchMedia(root);
@@ -77,7 +75,6 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
       let pictureActive = false;
       let cutawayActive = false;
       let activeChapter: HTMLElement | undefined;
-      let velocityDecay = 0;
 
       // Theatrical title-sequence entrance (headroom-safe scale from upper-center origin)
       let introTimeline: gsap.core.Timeline | undefined;
@@ -94,10 +91,10 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         }
         if (chars.length) {
           intro.from(chars, {
-            yPercent: 108,
+            y: 12,
             opacity: 0,
-            duration: 0.96,
-            stagger: 0.022,
+            duration: 0.76,
+            stagger: 0.017,
             clearProps: 'transform,opacity',
           }, 0.08);
         }
@@ -131,33 +128,18 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
 
       const timeline = gsap.timeline({ paused: true, defaults: { ease: 'none' } });
 
-      function revealCaption(words: HTMLElement[], lines: HTMLElement[], start: number, slow = false) {
-        if (words.length) {
-          gsap.set(words, { yPercent: 112, xPercent: 3, skewY: 2.2, autoAlpha: 0 });
-          timeline.to(words, {
-            yPercent: 0, xPercent: 0, skewY: 0, autoAlpha: 1,
-            duration: slow ? 0.046 : 0.033, stagger: slow ? 0.006 : 0.004, ease: 'power4.out',
-          }, start);
-        }
-        if (lines.length) {
-          gsap.set(lines, { y: 12, autoAlpha: 0 });
-          timeline.to(lines, {
-            y: 0, autoAlpha: 1,
-            duration: slow ? 0.043 : 0.03, stagger: 0.004, ease: 'power2.out',
-          }, start + (words.length ? 0.016 : 0));
-        }
+      function revealCaption(lines: NodeListOf<HTMLElement>, start: number, slow = false) {
+        gsap.set(lines, { y: 8, autoAlpha: 0 });
+        timeline.to(lines, {
+          y: 0, autoAlpha: 1,
+          duration: slow ? 0.044 : 0.032, stagger: 0.006, ease: 'sine.out',
+        }, start);
       }
 
-      function exitCaption(words: HTMLElement[], lines: HTMLElement[], end: number) {
-        if (lines.length) {
-          timeline.to(lines, { y: -8, autoAlpha: 0, duration: 0.017, ease: 'power2.in' }, end - 0.026);
-        }
-        if (words.length) {
-          timeline.to(words, {
-            yPercent: -106, xPercent: -1.25, skewY: -1.2, autoAlpha: 0,
-            duration: 0.021, stagger: 0.002, ease: 'power2.in',
-          }, end - 0.023);
-        }
+      function exitCaption(lines: NodeListOf<HTMLElement>, end: number) {
+        const start = end - 0.015;
+        timeline.to(lines, { y: -5, autoAlpha: 0, duration: captionFadeOut, ease: 'sine.inOut' }, start);
+        return start + captionFadeOut;
       }
 
       // Opening portrait: slow Steadicam push anchored near Sergio's eyes (zero head clip) + parting credits
@@ -165,39 +147,26 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         .to(backdrop, { scale: 1.055, duration: 0.165, ease: 'sine.inOut' }, 0.008)
         .to(illumination, { progress: 1, duration: 0.145, ease: 'sine.inOut' }, 0.028)
         .to(light, { '--hero-rim-opacity': 1.04, duration: 0.085, ease: 'sine.inOut' }, 0.055)
-        .to(details, { y: -14, autoAlpha: 0, duration: 0.036, ease: 'power2.inOut' }, 0.104)
-        .to(openingLabel, { yPercent: -80, autoAlpha: 0, duration: 0.026, ease: 'power2.inOut' }, 0.102);
-
-      if (firstLine) {
-        timeline.to(firstLine, {
-          yPercent: -32, autoAlpha: 0, duration: 0.038, ease: 'power2.inOut',
-        }, 0.108);
-      }
-      if (lastLine) {
-        timeline.to(lastLine, {
-          yPercent: -18, scale: 1.028, autoAlpha: 0, duration: 0.04, ease: 'power2.inOut',
-        }, 0.112);
-      }
-
-      timeline
-        .set(session, { autoAlpha: 1 }, heroChapters[0].start)
-        .to(portrait, { autoAlpha: 0, duration: openingDissolve, ease: 'sine.inOut' }, heroChapters[0].start);
+        .to(type, { y: -7, autoAlpha: 0, duration: 0.044, ease: 'sine.inOut' }, openingStart - 0.01)
+        .to(details, { y: -5, autoAlpha: 0, duration: 0.042, ease: 'sine.inOut' }, openingStart - 0.008)
+        .set(session, { autoAlpha: 1 }, openingStart)
+        .to(portrait, { autoAlpha: 0, duration: openingDissolve, ease: 'sine.inOut' }, openingStart);
 
       // The moving picture keeps its own time. Scroll cues only change its framing and captions.
       for (const [index, chapter] of chapters.entries()) {
         const { start, id, framing } = heroChapters[index];
-        const words = [...chapter.querySelectorAll<HTMLElement>('[data-chapter-word]')];
-        const lines = [...chapter.querySelectorAll<HTMLElement>('[data-chapter-line]')];
+        const lines = chapter.querySelectorAll<HTMLElement>('[data-chapter-line]');
         const plate = chapter.querySelector<HTMLElement>('[data-chapter-plate]');
-        const link = chapter.querySelectorAll<HTMLElement>('[data-chapter-link]');
         const nextStart = id === 'anticipation' ? performanceStart : heroChapters[index + 1]?.start ?? 1;
         const closing = chapter === discovery;
-        const captionStart = start + (index === 0 || closing ? 0.022 : 0.013);
+        const captionStart = start + (index === 0 || closing ? 0.017 : 0.009);
 
-        chapter.style.zIndex = String(10 + index);
-        timeline.to(chapter, {
-          autoAlpha: 1, duration: closing ? closingDissolve : 0.024, ease: 'sine.inOut',
-        }, start);
+        chapter.style.zIndex = String(closing ? 24 : 10 + index);
+        if (closing) {
+          timeline.to(chapter, { autoAlpha: 1, duration: closingDissolve, ease: 'sine.inOut' }, start);
+        } else {
+          timeline.set(chapter, { autoAlpha: 1 }, start);
+        }
 
         if (framing) {
           timeline.to(session, {
@@ -223,17 +192,11 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
           }, start);
         }
 
-        revealCaption(words, lines, captionStart, closing);
+        revealCaption(lines, captionStart, closing);
 
-        if (closing) {
-          chapter.style.zIndex = '24';
-          gsap.set(link, { y: 12, autoAlpha: 0 });
-          timeline.to(link, { y: 0, autoAlpha: 1, duration: 0.029, ease: 'power3.out' }, start + 0.055);
-        } else {
-          exitCaption(words, lines, nextStart);
-          timeline.to(chapter, {
-            autoAlpha: 0, duration: 0.017, ease: 'power2.inOut',
-          }, nextStart - 0.007);
+        if (!closing) {
+          const hiddenAt = exitCaption(lines, nextStart);
+          timeline.set(chapter, { autoAlpha: 0 }, hiddenAt);
         }
       }
 
@@ -251,8 +214,8 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         .to(cutLight, { opacity: 0, scale: 1.12, duration: 0.042, ease: 'sine.out' }, performanceStart + 0.005)
         .set(film, { autoAlpha: 0 }, discoveryStart + closingDissolve)
         .set(session, { autoAlpha: 0 }, discoveryStart + closingDissolve);
-      revealCaption(filmWords, filmLines, performanceStart + 0.016);
-      exitCaption(filmWords, filmLines, discoveryStart);
+      revealCaption(filmLines, performanceStart + 0.009);
+      exitCaption(filmLines, discoveryStart);
 
       function sync() {
         const progress = timeline.progress();
@@ -285,7 +248,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
           discoveryImage.removeAttribute('data-src');
         }
 
-        const nextPicture = progress >= heroChapters[0].start && progress < discoveryStart + closingDissolve;
+        const nextPicture = progress >= openingStart && progress < discoveryStart + closingDissolve;
         if (nextPicture !== pictureActive) {
           pictureActive = nextPicture;
           options.onPictureChange?.(pictureActive);
@@ -313,19 +276,10 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         end: 'bottom bottom',
         scrub: 0.62,
         onRefresh: sync,
-        onUpdate: (self) => {
-          const normalized = Math.max(-1, Math.min(1, self.getVelocity() / 2400));
-          root.style.setProperty('--scroll-v', normalized.toFixed(3));
-          window.clearTimeout(velocityDecay);
-          velocityDecay = window.setTimeout(() => {
-            root.style.setProperty('--scroll-v', '0');
-          }, 140);
-        },
       });
       sync();
 
       return () => {
-        window.clearTimeout(velocityDecay);
         introTimeline?.kill();
         options.onPictureChange?.(false);
         options.onCutawayChange?.(false);
@@ -337,7 +291,6 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
           chapter.style.removeProperty('z-index');
         }
         film.style.removeProperty('z-index');
-        root.style.removeProperty('--scroll-v');
         options.sweepCymbal?.(0);
         film.inert = true;
         film.setAttribute('aria-hidden', 'true');

@@ -15,7 +15,7 @@
   let menuToggle: HTMLButtonElement;
   const path = $derived(page.url.pathname.replace(/\/$/, '') || '/');
   const home = $derived(path === '/');
-  const light = $derived(['/about', '/education'].includes(path));
+  const light = $derived(['/about', '/education', '/workshops'].includes(path));
 
   afterNavigate(() => { expanded = false; });
 
@@ -79,13 +79,13 @@
   <div class="shell footer-content">
     <div class="footer-lead">
       <span class="eyebrow">Booking &amp; collaborations</span>
-      <h2>Let’s play.</h2>
+      <h2>{artist.tagline}</h2>
       <a class="footer-email" href={`mailto:${artist.email}`}>{artist.email}</a>
     </div>
     <nav class="footer-links" aria-label="Footer">
-      <a href="/about/">About</a>
-      <a href="/work/">Music</a>
-      <a href="/education/">Education</a>
+      {#each pages as item (item.href)}
+        <a href={item.href}>{item.label}</a>
+      {/each}
       <a href="/contact/">Contact</a>
     </nav>
     <div class="footer-social" aria-label="Social media">

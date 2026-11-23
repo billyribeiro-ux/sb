@@ -15,6 +15,7 @@
   } as const;
   const stepsPerBeat = pulseBeats[0].length;
   const stepDuration = 60 / pulseTempo / stepsPerBeat;
+  const exitFadeDuration = 0.6;
   const headingId = $props.id();
 
   let root: HTMLElement;
@@ -25,21 +26,44 @@
   let audioIssue = $state(false);
   let audio: AudioContext | undefined;
   let groove: ReturnType<typeof renderPulseComparison> | undefined;
-  let source: AudioBufferSourceNode | undefined;
+  let voice: {
+    source: AudioBufferSourceNode;
+    gain: GainNode;
+    start: number;
+    fading: boolean;
+  } | undefined;
   let frame: number | undefined;
   let playbackId = 0;
 
-  function stop() {
+  function stop(ended = false) {
     playbackId += 1;
     if (frame !== undefined) cancelAnimationFrame(frame);
     frame = undefined;
-    if (source) {
-      source.stop();
+    if (voice) {
+      const { source, gain } = voice;
+      voice = undefined;
+      source.onended = null;
+      if (!ended) source.stop();
       source.disconnect();
-      source = undefined;
+      gain.disconnect();
     }
     playing = null;
     currentStep = null;
+  }
+
+  function fadeOnExit() {
+    if (!voice || audio?.state !== 'running' || audio.currentTime < voice.start) {
+      stop();
+      return;
+    }
+    if (voice.fading) return;
+
+    const start = audio.currentTime;
+    const end = start + exitFadeDuration;
+    voice.fading = true;
+    voice.gain.gain.setValueAtTime(1, start);
+    voice.gain.gain.linearRampToValueAtTime(0, end);
+    voice.source.stop(end);
   }
 
   function stopFromControl() {
@@ -83,13 +107,18 @@
       const start = context.currentTime + 0.045;
       const barStart = version === 'with' ? barDuration : 0;
       const loop = context.createBufferSource();
+      const gain = context.createGain();
       loop.buffer = buffer;
       loop.loop = true;
       loop.loopStart = barStart;
       loop.loopEnd = barStart + barDuration;
-      loop.connect(context.destination);
+      loop.connect(gain);
+      gain.connect(context.destination);
       loop.start(start, barStart);
-      source = loop;
+      voice = { source: loop, gain, start, fading: false };
+      loop.onended = () => {
+        if (voice?.source === loop) stop(true);
+      };
 
       function draw() {
         if (context.state !== 'running') {
@@ -112,7 +141,7 @@
 
   onMount(() => {
     const viewport = new IntersectionObserver(([entry]) => {
-      if (!entry.isIntersecting && playing !== null) stop();
+      if (!entry.isIntersecting && playing !== null) fadeOnExit();
     });
     viewport.observe(study);
 

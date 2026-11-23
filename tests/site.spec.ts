@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 function artistIntro(page: Page) {
   return page.getByRole('dialog', { name: 'Sergio Bellotti', exact: true });
@@ -10,6 +10,17 @@ async function skipArtistIntro(page: Page) {
   await intro.getByRole('button', { name: 'Skip intro' }).click();
   await expect(intro).toBeHidden();
   await expect(page.locator('[data-hero-soundtrack]')).toHaveJSProperty('paused', true);
+}
+
+async function seekHero(hero: Locator, progress: number) {
+  await hero.evaluate((element, position) => {
+    const stage = element.querySelector('[data-hero-stage]')!;
+    const top = element.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo({
+      top: top + (element.clientHeight - stage.clientHeight) * position,
+      behavior: 'instant',
+    });
+  }, progress);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -27,7 +38,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('loads all five editorial pages with working navigation', async ({ page }) => {
+test('loads all six editorial pages with working navigation', async ({ page }) => {
   await page.goto('/');
   await skipArtistIntro(page);
   await expect(page.getByRole('heading', { level: 1 })).toHaveAccessibleName('Sergio Bellotti');
@@ -36,6 +47,7 @@ test('loads all five editorial pages with working navigation', async ({ page }) 
     { link: 'About', path: '/about/', heading: /From Bari.*to Boston/ },
     { link: 'Music', path: '/work/', heading: /Music in motion/ },
     { link: 'Education', path: '/education/', heading: /Make it groove/ },
+    { link: 'Workshops & Clinics', path: '/workshops/', heading: 'Workshops & Clinics.' },
     { link: 'Get in touch', path: '/contact/', heading: /Let’s make.*something move/ },
   ];
   for (const route of routes) {
@@ -44,6 +56,38 @@ test('loads all five editorial pages with working navigation', async ({ page }) 
     await expect(page.getByRole('heading', { level: 1 })).toHaveAccessibleName(route.heading);
   }
   await expect(page.getByRole('link', { name: 'WhatsApp' })).toHaveAttribute('href', 'https://wa.me/16173127090');
+});
+
+test('selects a workshop format and opens the matching clinic information', async ({ page }) => {
+  await page.goto('/workshops/');
+  const workshops = page.getByRole('radio', { name: 'Group workshops' });
+  const clinics = page.getByRole('radio', { name: 'Technique clinics' });
+  await expect(workshops).toBeChecked();
+  await workshops.press('ArrowRight');
+  await expect(clinics).toBeChecked();
+  await expect(page.getByRole('heading', { name: 'Explore the hidden pulse.' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Read Berklee’s clinic notes' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Contact Sergio about a workshop' })).toHaveAttribute('href', '/contact/');
+});
+
+test('replays the Bari to Boston route and shows it statically with reduced motion', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/about/');
+  const map = page.locator('[data-journey-map]');
+  const replay = map.getByRole('button', { name: 'Replay route' });
+  await expect(map.getByRole('heading', { name: 'Across the Atlantic.' })).toBeVisible();
+  await map.scrollIntoViewIfNeeded();
+  await expect(map).toHaveAttribute('data-map-state', 'complete');
+  await replay.press('Enter');
+  await expect(map).toHaveAttribute('data-map-state', 'playing');
+  await expect(map).toHaveAttribute('data-map-state', 'complete');
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.reload();
+  await expect(map).toHaveAttribute('data-map-state', 'static');
+  await expect(replay).toBeHidden();
+  await expect(map.getByText('Bari', { exact: true }).first()).toBeVisible();
+  await expect(map.getByText('Boston', { exact: true }).first()).toBeVisible();
 });
 
 test('opens, navigates, and closes the gallery with the keyboard', async ({ page }) => {
@@ -158,13 +202,8 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
   const playSound = hero.getByRole('button', { name: 'Play soundtrack' });
   const muteSound = hero.getByRole('button', { name: 'Mute soundtrack' });
   const pictureTime = () => picture.evaluate((video: HTMLVideoElement) => video.currentTime);
-  const seek = (progress: number) => hero.evaluate((element, p) => {
-    const stage = element.querySelector('[data-hero-stage]')!;
-    const top = element.getBoundingClientRect().top + window.scrollY;
-    window.scrollTo({ top: top + (element.clientHeight - stage.clientHeight) * p, behavior: 'instant' });
-  }, progress);
   const visitChapter = async (position: number, scene: string, title: string) => {
-    await seek(position);
+    await seekHero(hero, position);
     await expect(hero).toHaveAttribute('data-scene', scene);
     await expect(activeShot).toHaveCount(1);
     await expect(activeShot).toHaveAttribute('data-hero-chapter', scene);
@@ -194,7 +233,7 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
   const nameRight = await hero.locator('.hero-name-last').evaluate((element) => element.getBoundingClientRect().right);
   expect(nameRight).toBeLessThan(720);
 
-  await seek(.10);
+  await seekHero(hero, .10);
   await expect(hero).toHaveAttribute('data-scene', 'portrait');
   await expect(poster).toHaveCSS('opacity', '1');
 
@@ -227,7 +266,7 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
     lastPosition = positionInFilm;
   }
 
-  await seek(.77);
+  await seekHero(hero, .77);
   await expect(hero).toHaveAttribute('data-scene', 'film');
   await expect(film).toHaveAttribute('aria-hidden', 'false');
   await expect(discovery).toBeHidden();
@@ -250,7 +289,7 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
   await expect(soundtrack).toHaveJSProperty('paused', true);
 
   for (const position of [.875, .98]) {
-    await seek(position);
+    await seekHero(hero, position);
     // The scene name is already set during this hold. Let the scrubbed frame catch up.
     if (position === .98) await page.waitForTimeout(750);
     await expect(hero).toHaveAttribute('data-scene', 'discovery');
@@ -260,12 +299,40 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
   }
   await expect(picture).toHaveJSProperty('paused', true);
 
-  await seek(0);
+  await seekHero(hero, 0);
   await expect(hero).toHaveAttribute('data-scene', 'portrait');
   await expect(poster).toHaveCSS('opacity', '1');
   await expect(discovery).toBeHidden();
   await expect(film).toHaveAttribute('inert', '');
   await expect(picture).toHaveJSProperty('paused', true);
+});
+
+test('keeps long hero captions within the narrow stage during a reveal', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/');
+  await skipArtistIntro(page);
+  const hero = page.locator('[data-hero-sequence]');
+  await expect(hero).toHaveAttribute('data-cinematic', 'true');
+  await seekHero(hero, .335);
+  await expect(hero).toHaveAttribute('data-scene', 'technique');
+  const caption = hero.locator('[data-hero-chapter=technique] .hero-chapter-copy');
+  await expect(caption.getByRole('heading', { name: 'Technique' })).toBeVisible();
+  await expect.poll(() => caption.evaluate((element) => {
+    const dock = element.closest('[data-hero-stage]')?.querySelector('.hero-dock')?.getBoundingClientRect();
+    if (!dock) return false;
+    const captionFits = [...element.querySelectorAll('h2, p')].every((line) => {
+      const range = document.createRange();
+      range.selectNodeContents(line);
+      const box = range.getBoundingClientRect();
+      return box.width > 0 && box.left >= 0 && box.right <= document.documentElement.clientWidth &&
+        box.top >= 0 && box.bottom <= dock.top;
+    });
+    return captionFits && [element, ...element.querySelectorAll('*')].every((line) => {
+      const style = getComputedStyle(line);
+      return style.overflowY === 'visible' && style.clipPath === 'none' && style.maskImage === 'none';
+    });
+  })).toBe(true);
 });
 
 test('cymbal responds to a keyboard strike with the graphical fallback available', async ({ page }) => {

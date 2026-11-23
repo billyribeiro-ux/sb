@@ -1,5 +1,6 @@
 export const artist = {
   name: 'Sergio Bellotti',
+  tagline: 'Groove On',
   email: 'sergiobellotti@gmail.com',
   canonical: 'https://www.sergiobellotti.com',
   instagram: 'https://www.instagram.com/sergio.bellotti/',
@@ -13,4 +14,5 @@ export const pages = [
   { label: 'About', href: '/about/' },
   { label: 'Music', href: '/work/' },
   { label: 'Education', href: '/education/' },
+  { label: 'Workshops & Clinics', href: '/workshops/' },
 ] as const;

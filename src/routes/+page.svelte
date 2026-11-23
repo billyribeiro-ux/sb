@@ -119,11 +119,11 @@
           </a>
         </article>
         <article data-motion-reveal>
-          <a href="/education/">
+          <a href="/workshops/">
             <figure>
               <img src="/images/home-ensemble.webp" srcset="/images/home-ensemble-768.webp 768w, /images/home-ensemble-1280.webp 1280w, /images/home-ensemble.webp 1920w" sizes="(max-width: 750px) 90vw, 46vw" alt="Sergio Bellotti with an ensemble of musicians holding their instruments" width="1920" height="1536" loading="lazy" decoding="async" />
             </figure>
-            <div><h3>Teaching &amp; clinics</h3><p>Private lessons, workshops, and percussion at Berklee.</p></div>
+            <div><h3>Teaching &amp; clinics</h3><p>Explore group workshops, drum clinics, and masterclasses.</p></div>
           </a>
         </article>
       </div>
