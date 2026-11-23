@@ -146,7 +146,7 @@ test('the inline opening runs on reload with navigation and Watch performance en
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/');
   await skipArtistIntro(page);
-  const opening = page.getByText('The Notes Between', { exact: true }).locator('..');
+  const opening = page.locator('[data-artist-opening]');
   await expect(opening).toHaveAttribute('data-opening-motion', 'active');
   await expect(page.getByRole('link', { name: 'Watch performance' })).toBeEnabled();
   await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
@@ -169,13 +169,13 @@ test('the opening lets visitors enter with sound', async ({ page }) => {
   const hero = page.locator('[data-hero-sequence]');
   const frame = hero.locator('[data-hero-backdrop]');
   await expect(hero).toHaveAttribute('data-intro-phase', 'revealing');
+  await expect(frame).toHaveCSS('animation-name', 'hero-arrival-image');
   await expect(frame).toHaveCSS('animation-duration', '3.6s');
-  await expect(frame).toHaveCSS('transform', 'none');
-  const openingPosition = await frame.boundingBox();
-  expect(openingPosition?.y).toBe(0);
+  await expect(frame).not.toHaveCSS('transform', 'none');
 
   await expect(hero).toHaveAttribute('data-cinematic', 'true');
-  expect(await frame.boundingBox()).toEqual(openingPosition);
+  await expect(frame).toHaveCSS('transform', 'none');
+  expect(await frame.boundingBox()).toEqual(await hero.locator('[data-hero-stage]').boundingBox());
   await expect(page.getByRole('button', { name: 'Mute soundtrack' })).toBeVisible();
 });
 
@@ -348,7 +348,8 @@ test('keeps long hero captions within the narrow stage during a reveal', async (
       return box.width > 0 && box.left >= 0 && box.right <= document.documentElement.clientWidth &&
         box.top >= 0 && box.bottom <= dock.top;
     });
-    return captionFits && [element, ...element.querySelectorAll('*')].every((line) => {
+    // Word masks are intentional during the kinetic reveal; the caption itself must remain unclipped.
+    return captionFits && [element, ...element.querySelectorAll('*:not(.hero-title-word)')].every((line) => {
       const style = getComputedStyle(line);
       return style.overflowY === 'visible' && style.clipPath === 'none' && style.maskImage === 'none';
     });
@@ -381,4 +382,17 @@ test('film sound is opt-in on both performance reels', async ({ page }) => {
     await page.getByRole('button', { name: 'Mute film' }).click();
     await expect(film).toHaveJSProperty('muted', true);
   }
+});
+
+test('explicit hero sound works with reduced motion and static chapters', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  const soundtrack = page.locator('[data-hero-soundtrack]');
+  await expect(page.getByRole('heading', { name: 'Seven movements. One performance.' })).toBeVisible();
+  await expect(page.locator('.hero-static-chapter')).toHaveCount(7);
+  await page.getByRole('button', { name: 'Play soundtrack' }).click();
+  await expect(page.getByRole('button', { name: 'Mute soundtrack' })).toBeVisible();
+  await expect(soundtrack).toHaveJSProperty('paused', false);
+  await page.getByRole('button', { name: 'Mute soundtrack' }).click();
+  await expect(soundtrack).toHaveJSProperty('paused', true);
 });

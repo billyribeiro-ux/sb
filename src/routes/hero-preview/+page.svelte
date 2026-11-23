@@ -5,6 +5,7 @@
   import HeroCaptionStudy from './HeroCaptionStudy.svelte';
 
   const captionStudy = $derived(page.url.searchParams.get('study') === 'type');
+  const openingEdit = { ...studioOpeningEdit, soundDuringOpening: true };
 
 </script>
 
@@ -16,7 +17,7 @@
 {#if captionStudy}
   <HeroCaptionStudy />
 {:else}
-  <ArtistHero openingEdit={studioOpeningEdit} comparisonHref="/#hear-the-difference" filmHref="/#performance-film" />
+  <ArtistHero {openingEdit} comparisonHref="/#hear-the-difference" filmHref="/#performance-film" />
 
   <div class="preview-exit">
     <a href="#top">Back to opening</a>

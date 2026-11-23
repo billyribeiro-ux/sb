@@ -3,11 +3,14 @@ export interface HeroFraming {
   xPercent: number;
   yPercent: number;
   shade: number;
+  brightness?: number;
+  saturation?: number;
 }
 
 export interface HeroChapter {
   id: string;
   title: string;
+  kicker: string;
   copy: string;
   start: number;
   framing?: HeroFraming;
@@ -28,7 +31,7 @@ export const studioOpeningEdit: HeroOpeningEdit = {
   frameRate: 30,
 };
 
-export const widePerformanceFraming: HeroFraming = { scale: 1, xPercent: 0, yPercent: 0, shade: .74 };
+export const widePerformanceFraming: HeroFraming = { scale: 1, xPercent: 0, yPercent: 0, shade: .74, brightness: 1, saturation: 1 };
 
 export const notesFilm = {
   src: '/videos/sergio-notes-between.mp4?edit=front',
@@ -45,38 +48,38 @@ export const heroSession = {
 
 export const heroChapters: HeroChapter[] = [
   {
-    id: 'groove', title: 'Groove', start: .28,
-    copy: 'Keep the pulse steady. Let the ride cymbal and snare shape how it feels.',
-    framing: { scale: 1.025, xPercent: 0, yPercent: 0, shade: .9 },
+    id: 'groove', title: 'Groove', kicker: 'Movement I · The foundation', start: .28,
+    copy: 'The room finds its pulse. Ride, snare, and kick lock into a feel you sense before you hear it.',
+    framing: { scale: 1.035, xPercent: 0, yPercent: 0, shade: .88, brightness: 1.04, saturation: 1.08 },
   },
   {
-    id: 'control', title: 'Control', start: .355,
-    copy: 'Let the backbeat speak clearly. Keep the ghost notes soft enough that you feel them before you hear them.',
-    framing: { scale: 1.125, xPercent: 3.25, yPercent: .35, shade: .93 },
+    id: 'control', title: 'Control', kicker: 'Movement II · Power with restraint', start: .355,
+    copy: 'The backbeat stays commanding. The ghost notes barely touch the surface. Power lives in the space between.',
+    framing: { scale: 1.16, xPercent: 4.5, yPercent: .5, shade: .92, brightness: .9, saturation: .78 },
   },
   {
-    id: 'technique', title: 'Technique', start: .435,
-    copy: 'A relaxed grip gives the stick room to rebound and leaves the hand ready for the next stroke.',
-    framing: { scale: 1.235, xPercent: -4.25, yPercent: -1.1, shade: 1 },
+    id: 'technique', title: 'Technique', kicker: 'Movement III · Effort becomes motion', start: .435,
+    copy: 'A relaxed grip turns effort into rebound. Every stroke is already preparing the next.',
+    framing: { scale: 1.32, xPercent: -6, yPercent: -1.5, shade: .94, brightness: 1.08, saturation: .92 },
   },
   {
-    id: 'flow', title: 'Flow', start: .518,
-    copy: 'Move the phrase from snare to toms and keep its place in the bar.',
-    framing: { scale: 1.155, xPercent: 4.2, yPercent: -.4, shade: .86 },
+    id: 'flow', title: 'Flow', kicker: 'Movement IV · Momentum without gravity', start: .518,
+    copy: 'One idea travels from snare to toms, gathering momentum without ever losing its place in the bar.',
+    framing: { scale: 1.18, xPercent: 5.5, yPercent: -.6, shade: .8, brightness: 1.02, saturation: 1.12 },
   },
   {
-    id: 'musicality', title: 'Musicality', start: .599,
-    copy: 'Leave room for the bass, bring one accent forward, and let the cymbal ring.',
-    framing: { scale: 1.045, xPercent: -.7, yPercent: 0, shade: .8 },
+    id: 'musicality', title: 'Musicality', kicker: 'Movement V · The space is an instrument', start: .599,
+    copy: 'An accent leans forward. A cymbal opens the room. What remains unplayed changes everything.',
+    framing: { scale: 1.09, xPercent: -1.5, yPercent: 0, shade: .82, brightness: .94, saturation: .82 },
   },
   {
-    id: 'anticipation', title: 'Before the hit', start: .677,
-    copy: 'Watch where the sticks rise before the next accented note.',
-    framing: { scale: 1.19, xPercent: -1.8, yPercent: .85, shade: .98 },
+    id: 'anticipation', title: 'Before the hit', kicker: 'Movement VI · A fraction of forever', start: .677,
+    copy: 'For a suspended instant, everything is possibility. Then the stick falls.',
+    framing: { scale: 1.29, xPercent: -2.5, yPercent: 1.2, shade: .96, brightness: .86, saturation: .72 },
   },
   {
-    id: 'discovery', title: 'The quiet notes', start: .86,
-    copy: 'Same tempo. Same backbeat. Hear what four quiet snare strokes change.',
+    id: 'discovery', title: 'The quiet notes', kicker: 'Movement VII · Hear what was always there', start: .86,
+    copy: 'Same tempo. Same backbeat. Four quiet strokes change everything.',
   },
 ];
 

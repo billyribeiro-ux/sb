@@ -19,6 +19,8 @@ function framingStyles(framing: HeroFraming) {
     '--session-pan': `${framing.xPercent}%`,
     '--session-rise': `${framing.yPercent}%`,
     '--session-shade': framing.shade,
+    '--session-brightness': framing.brightness ?? 1,
+    '--session-saturation': framing.saturation ?? 1,
   };
 }
 
@@ -42,12 +44,19 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
   const light = element('rim');
   const film = element('finale');
   const caption = element('finale-title');
+  const flash = element('flash');
+  const lightLeak = element('leak');
+  const scrollInstruction = element('scroll');
+  const sceneCount = element('scene-count');
+  const sceneName = element('scene-name');
+  const sceneMeter = element('scene-meter');
   const chapters = [...root.querySelectorAll<HTMLElement>('[data-hero-chapter]')];
   if (!portrait || !backdrop || !session || !type || !details || !light ||
       !film || !caption || chapters.length !== heroChapters.length) return;
 
   const layers = {
     portrait, backdrop, session, type, details, light, film, caption,
+    flash, lightLeak, scrollInstruction, sceneCount, sceneName, sceneMeter,
   };
   const preference = window.matchMedia(motionQuery);
   let disposed = false;
@@ -62,6 +71,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
 
     const {
       portrait, backdrop, session, type, details, light, film, caption,
+      flash, lightLeak, scrollInstruction, sceneCount, sceneName, sceneMeter,
     } = layers;
     const discovery = chapters[chapters.length - 1];
     const discoveryStart = heroChapters[heroChapters.length - 1].start;
@@ -101,11 +111,14 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         }
         if (chars.length) {
           intro.from(chars, {
-            y: 12,
+            y: 84,
+            rotationX: -72,
+            transformOrigin: '50% 100%',
             opacity: 0,
-            duration: 0.76,
-            stagger: 0.017,
-            clearProps: 'transform,opacity',
+            filter: 'blur(8px)',
+            duration: 1.15,
+            stagger: 0.032,
+            clearProps: 'transform,opacity,filter',
           }, 0.08);
         }
         if (metaLines.length) {
@@ -135,6 +148,8 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
       gsap.set(film, { autoAlpha: 0 });
       gsap.set(session, { autoAlpha: 0, ...framingStyles(widePerformanceFraming) });
       if (cutaway) gsap.set(cutaway, { autoAlpha: 0 });
+      if (flash) gsap.set(flash, { autoAlpha: 0 });
+      if (lightLeak) gsap.set(lightLeak, { autoAlpha: 0, xPercent: -125 });
 
       const timeline = gsap.timeline({ paused: true, defaults: { ease: 'none' } });
       const sessionReveal = openingStart * .38;
@@ -147,24 +162,37 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
 
       function revealCaption(lines: NodeListOf<HTMLElement>, start: number) {
         gsap.set(lines, {
-          y: (index) => index === 0 ? typeTravel : typeTravel * .52,
-          scale: .981, rotationX: -8, transformPerspective: 900,
-          filter: 'blur(7px)', autoAlpha: 0,
+          y: (index) => index === 0 ? typeTravel * .55 : typeTravel * .34,
+          filter: 'blur(5px)', autoAlpha: 0,
         });
         timeline.to(lines, {
-          y: 0, scale: 1, rotationX: 0, autoAlpha: 1, filter: 'blur(0px)',
-          duration: .072, stagger: .009, ease: 'sine.out',
+          y: 0, autoAlpha: 1, filter: 'blur(0px)',
+          duration: .068, stagger: .012, ease: 'power3.out',
         }, start);
       }
 
       function exitCaption(lines: NodeListOf<HTMLElement>, boundary: number) {
         const start = boundary - captionExitLead;
         timeline.to(lines, {
-          y: (index) => index === 0 ? -typeTravel : -typeTravel * .58,
-          scale: 1.027, rotationX: 7, filter: 'blur(6px)', autoAlpha: 0,
-          duration: captionFadeOut, ease: 'sine.inOut',
+          y: (index) => index === 0 ? -typeTravel * .45 : -typeTravel * .28,
+          filter: 'blur(5px)', autoAlpha: 0,
+          duration: captionFadeOut, ease: 'power2.in',
         }, start);
         return start + captionFadeOut;
+      }
+
+      function opticalCue(start: number, strength = .28) {
+        if (flash) {
+          timeline.to(flash, { autoAlpha: strength, duration: .014, ease: 'power2.in' }, start)
+            .to(flash, { autoAlpha: 0, duration: .07, ease: 'power2.out' }, start + .014);
+        }
+        if (lightLeak) {
+          timeline.fromTo(lightLeak,
+            { autoAlpha: 0, xPercent: -125 },
+            { autoAlpha: .72, xPercent: 340, duration: .12, ease: 'power2.inOut', immediateRender: false },
+            start - .018,
+          ).to(lightLeak, { autoAlpha: 0, duration: .035 }, start + .102);
+        }
       }
 
       if (editedOpening) {
@@ -198,11 +226,18 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
           y: -typeTravel * .46, filter: 'blur(4px)', autoAlpha: 0, duration: .08, ease: 'sine.inOut',
         }, grooveCaptionStart - .044);
 
+      if (scrollInstruction) timeline.to(scrollInstruction, { autoAlpha: 0, duration: .045 }, grooveCaptionStart - .04);
+      opticalCue(grooveCaptionStart - .02, .42);
+
       if (cutaway) {
         timeline
-          .to(cutaway, { autoAlpha: 1, duration: .065, ease: 'sine.inOut' }, cutawayStart - .029)
+          .fromTo(cutaway,
+            { autoAlpha: 0, clipPath: 'inset(48% 0 48% 0)' },
+            { autoAlpha: 1, clipPath: 'inset(0% 0 0% 0)', duration: .075, ease: 'power3.out', immediateRender: false },
+            cutawayStart - .029,
+          )
           .to(cutaway, {
-            autoAlpha: 0, duration: cutawayTail + .028, ease: 'sine.inOut',
+            autoAlpha: 0, clipPath: 'inset(0 0 100% 0)', duration: cutawayTail + .028, ease: 'power2.in',
           }, cutawayEnd - .028);
       }
 
@@ -211,17 +246,24 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         const { start, id, framing } = heroChapters[index];
         const lines = chapter.querySelectorAll<HTMLElement>('[data-chapter-line]');
         const plate = chapter.querySelector<HTMLElement>('[data-chapter-plate]');
+        const titleChars = chapter.querySelectorAll<HTMLElement>('[data-hero-title-char]');
         const nextStart = id === 'anticipation' ? performanceStart : heroChapters[index + 1]?.start ?? 1;
         const closing = chapter === discovery;
         const captionStart = index === 0 ? grooveCaptionStart : start - captionLead;
 
         chapter.style.zIndex = String(closing ? 24 : 10 + index);
         if (closing) {
-          timeline.to(chapter, {
+          timeline.fromTo(chapter,
+            { clipPath: 'inset(9% 6%)' },
+            { clipPath: 'inset(0% 0%)', duration: closingLead + closingTail, ease: 'power3.out', immediateRender: false },
+            start - closingLead,
+          ).to(chapter, {
             autoAlpha: 1, duration: closingLead + closingTail, ease: 'sine.inOut',
           }, start - closingLead);
+          opticalCue(start - closingLead, .5);
         } else {
           timeline.set(chapter, { autoAlpha: 1 }, captionStart);
+          if (index > 0) opticalCue(captionStart + .004, id === 'anticipation' ? .44 : .22);
         }
 
         if (framing) {
@@ -236,6 +278,11 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
           }, start - closingLead);
         }
 
+        gsap.set(titleChars, { yPercent: 128, rotationX: -72, opacity: 0, transformOrigin: '0% 100%' });
+        timeline.to(titleChars, {
+          yPercent: 0, rotationX: 0, opacity: 1,
+          duration: .075, stagger: .0032, ease: 'power4.out',
+        }, captionStart + .012);
         revealCaption(lines, captionStart);
 
         if (!closing) {
@@ -255,6 +302,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         .set(session, { autoAlpha: 0 }, closingEnd);
       revealCaption(filmLines, performanceStart - captionLead);
       exitCaption(filmLines, discoveryStart);
+      opticalCue(performanceStart - captionLead, .58);
 
       function sync() {
         const progress = timeline.progress();
@@ -270,6 +318,13 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         const scene = inFilm ? 'film' : heroChapters[index]?.id ?? 'portrait';
 
         if (root.dataset.scene !== scene) root.dataset.scene = scene;
+
+        const statusChapter = !inFilm && nextChapter ? heroChapters[visibleIndex] : undefined;
+        const nextCount = inFilm ? 'LIVE' : statusChapter ? `${String(visibleIndex + 1).padStart(2, '0')} / 07` : '00 / 07';
+        const nextName = inFilm ? 'Happy People 7/4' : statusChapter?.title ?? 'Opening titles';
+        if (sceneCount && sceneCount.textContent !== nextCount) sceneCount.textContent = nextCount;
+        if (sceneName && sceneName.textContent !== nextName) sceneName.textContent = nextName;
+        if (sceneMeter) sceneMeter.style.transform = `scaleX(${progress})`;
 
         if (activeChapter !== nextChapter) {
           if (activeChapter) {
@@ -340,6 +395,9 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         film.setAttribute('aria-hidden', 'true');
         delete root.dataset.scene;
         delete root.dataset.cinematic;
+        if (sceneCount) sceneCount.textContent = '00 / 07';
+        if (sceneName) sceneName.textContent = 'Opening titles';
+        if (sceneMeter) sceneMeter.style.transform = 'scaleX(0)';
       };
     });
 

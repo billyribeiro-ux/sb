@@ -32,7 +32,7 @@
     openingEdit,
   }: Props = $props();
   let rootEl: HTMLElement | undefined;
-  let rimLight: HeroRimLight | undefined;
+  let rimLight = $state<HeroRimLight>();
   let depthPortrait = $state<HeroDepthPortrait>();
   let audio: ReturnType<typeof createCymbalAudio> | undefined;
   let transport = $state<ReturnType<typeof mountHeroPerformance>>();
@@ -59,11 +59,9 @@
     rootEl = node;
     let sequence: ReturnType<typeof heroSequence>;
     let introTimer = 0;
-    let minimumElapsed = false;
     const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
     const playback = mountHeroPerformance(stage, video, soundtrack, (playing) => {
       soundPlaying = playing;
-      if (playing && minimumElapsed) beginIntro?.();
     }, cutaway, openingEdit);
     transport = playback;
 
@@ -109,10 +107,6 @@
         startSequence(true);
         void tick().then(() => rootEl?.querySelector<HTMLElement>('#hero-title')?.focus({ preventScroll: true }));
       };
-      introTimer = window.setTimeout(() => {
-        minimumElapsed = true;
-        if (soundPlaying) beginIntro?.();
-      }, 1100);
       motionPreference.addEventListener('change', finishIfReduced);
     } else {
       startSequence();
@@ -224,7 +218,7 @@
       </div>
       <div class="hero-poster-shade"></div>
       <div class="hero-rim" data-hero-rim aria-hidden="true">
-        <HeroRimLight bind:this={rimLight} />
+        {#if !openingEdit}<HeroRimLight bind:this={rimLight} />{/if}
       </div>
       {#if strikes}
         {#key strikes}
@@ -267,8 +261,15 @@
           <div class="hero-chapter-grade" aria-hidden="true"></div>
         {/if}
         <div class="hero-chapter-copy">
-          <h2 id={`hero-chapter-${chapter.id}`} data-chapter-line>{chapter.title}</h2>
-          <p data-chapter-line>{chapter.copy}</p>
+          <p class="hero-chapter-kicker" data-chapter-line>{chapter.kicker}</p>
+          <h2 id={`hero-chapter-${chapter.id}`} aria-label={chapter.title} data-chapter-line data-chapter-title>
+            {#each chapter.title.split(' ') as word}
+              <span class="hero-title-word" aria-hidden="true">
+                {#each [...word] as char}<span class="hero-title-char" data-hero-title-char>{char}</span>{/each}
+              </span>
+            {/each}
+          </h2>
+          <p class="hero-chapter-description" data-chapter-line>{chapter.copy}</p>
           {#if chapter.id === 'discovery'}
             <a href={comparisonHref} data-chapter-line>Try the ghost-note comparison</a>
           {/if}
@@ -284,7 +285,21 @@
       </div>
     </div>
 
+    <div class="hero-optical-flash" data-hero-flash aria-hidden="true"></div>
+    <div class="hero-light-leak" data-hero-leak aria-hidden="true"></div>
     <div class="hero-grain" aria-hidden="true"></div>
+    {#if introPhase === 'revealing'}
+      <div class="hero-arrival-burst" aria-hidden="true"><span></span><span></span></div>
+    {/if}
+
+    <div class="hero-sequence-hud" aria-hidden="true">
+      <span class="hero-scene-count" data-hero-scene-count>00 / 07</span>
+      <span class="hero-scene-name" data-hero-scene-name>Opening titles</span>
+      <span class="hero-scene-track"><span data-hero-scene-meter></span></span>
+    </div>
+    <div class="hero-scroll-instruction" data-hero-scroll aria-hidden="true">
+      <span>Scroll to enter the performance</span><i></i>
+    </div>
 
     <div class="hero-meta" data-hero-details>
       <p class="hero-origin" data-hero-meta-line>Bari, Italy <span></span> Boston, MA</p>
@@ -315,6 +330,20 @@
         </a>
       </div>
     </div>
+  </div>
+
+  <div class="hero-static-chapters" aria-labelledby="hero-static-title">
+    <div class="hero-static-heading">
+      <p>The Notes Between</p>
+      <h2 id="hero-static-title">Seven movements.<br />One performance.</h2>
+    </div>
+    {#each heroChapters as chapter, index (chapter.id)}
+      <article class="hero-static-chapter">
+        <span>{String(index + 1).padStart(2, '0')}</span>
+        <h3>{chapter.title}</h3>
+        <div><p>{chapter.copy}</p>{#if chapter.id === 'discovery'}<a href={comparisonHref}>Try the ghost-note comparison</a>{/if}</div>
+      </article>
+    {/each}
   </div>
 </section>
 

@@ -54,7 +54,7 @@ export function mountHeroPerformance(
   flow.muted = true;
 
   const onStage = () => stageVisible && !blocked && !document.hidden;
-  const soundAllowed = () => !blocked && !document.hidden && soundChoice !== 'off' &&
+  const soundAllowed = () => entered && !blocked && !document.hidden && soundChoice !== 'off' &&
     (soundChoice === 'on' || !reducedMotion.matches);
 
   function reportSound(playing: boolean) {
@@ -129,7 +129,8 @@ export function mountHeroPerformance(
   function playSound(joinPicture = false) {
     if (!onStage() || !soundAllowed() || needsGesture || pendingSound || !audio.paused) return;
     if (openingEdit) {
-      if (!pictureActive && (!openingEdit.soundDuringOpening || !scrubbingOpening)) return;
+      const explicitStaticPlayback = soundChoice === 'on' && (reducedMotion.matches || !stage.hasAttribute('data-opening-scrub') && !pictureActive);
+      if (!pictureActive && !explicitStaticPlayback && (!openingEdit.soundDuringOpening || !scrubbingOpening)) return;
       if (pictureActive && (video.paused || video.seeking ||
           video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA)) return;
     }
@@ -345,6 +346,7 @@ export function mountHeroPerformance(
     prepareOpening() {
       entered = true;
       updatePreload();
+      update();
     },
     seekOpening,
     setCutawayActive(active: boolean) {
