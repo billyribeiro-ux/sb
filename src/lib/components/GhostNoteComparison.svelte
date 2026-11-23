@@ -18,6 +18,7 @@
   const headingId = $props.id();
 
   let root: HTMLElement;
+  let study: HTMLDivElement;
   let selection = $state<Version>('with');
   let playing = $state<Version | null>(null);
   let currentStep = $state<number | null>(null);
@@ -39,6 +40,12 @@
     }
     playing = null;
     currentStep = null;
+  }
+
+  function stopFromControl() {
+    const activeChoice = study.querySelector<HTMLButtonElement>('[aria-pressed="true"]');
+    stop();
+    activeChoice?.focus({ preventScroll: true });
   }
 
   async function play(version: Version) {
@@ -104,6 +111,11 @@
   }
 
   onMount(() => {
+    const viewport = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting && playing !== null) stop();
+    });
+    viewport.observe(study);
+
     function onAudioFocus(event: Event) {
       if ((event as CustomEvent<Element>).detail !== root) stop();
     }
@@ -117,6 +129,7 @@
     document.addEventListener('sergio:audio-focus', onAudioFocus);
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
+      viewport.disconnect();
       document.removeEventListener('sergio:audio-focus', onAudioFocus);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       stop();
@@ -133,7 +146,7 @@
       <p>Play the same groove both ways and listen for the quiet snare strokes between the backbeats.</p>
     </div>
 
-    <div class="study">
+    <div class="study" bind:this={study}>
       <p class="study-meta">Synthesized drum exercise <span>{pulseTempo} BPM · Loop</span></p>
       <div class="pattern" aria-hidden="true">
         {#each pulseBeats as beat, index (index)}
@@ -168,7 +181,15 @@
       {#if audioIssue}
         <p class="status" role="status">This browser couldn’t start the sound. The snare pattern is still shown above.</p>
       {/if}
-      <a href="/education/#practice-heading">Explore Sergio’s drum education</a>
+      <div class="study-footer">
+        <a href="/education/#practice-heading">Explore Sergio’s drum education</a>
+        {#if playing !== null}
+          <button class="stop-control" type="button" aria-label="Stop drum comparison" onclick={stopFromControl}>
+            <span class="control-icon stop-icon" aria-hidden="true"></span>
+            Stop
+          </button>
+        {/if}
+      </div>
     </div>
   </div>
 </section>
@@ -198,11 +219,20 @@
 
   a {
     display: inline-block;
-    margin-block-start: 1.1rem;
     color: var(--ivory);
     font-weight: 600;
     text-underline-offset: 0.25em;
     text-decoration-color: var(--bronze);
+  }
+
+  .study-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem 1rem;
+    margin-block-start: 0.7rem;
+    min-block-size: 2.75rem;
   }
 
   .study {
@@ -290,6 +320,7 @@
   }
 
   .stop-icon { inline-size: 0.6rem; block-size: 0.6rem; clip-path: none; }
+  .stop-control { padding-inline: 0.8rem; }
   .status { margin-top: 0.8rem; color: #f5ded1; }
 
   @media (max-width: 56rem) {

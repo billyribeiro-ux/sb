@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import type { Attachment } from 'svelte/attachments';
   import ArrowDownIcon from 'phosphor-svelte/lib/ArrowDownIcon';
   import PlayIcon from 'phosphor-svelte/lib/PlayIcon';
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import SpeakerSlashIcon from 'phosphor-svelte/lib/SpeakerSlashIcon';
   import WaveformIcon from 'phosphor-svelte/lib/WaveformIcon';
+  import ArtistLoader from './ArtistLoader.svelte';
   import ArtistOpening from './ArtistOpening.svelte';
   import HeroRimLight from '#lib/motion/HeroRimLight.svelte';
   import { heroSequence } from '#lib/motion/hero-sequence';
@@ -19,6 +21,8 @@
   let audio: ReturnType<typeof createCymbalAudio> | undefined;
   let transport = $state<ReturnType<typeof mountHeroPerformance>>();
   let soundPlaying = $state(false);
+  let introOpen = $state(false);
+  let finishIntro: (() => void) | undefined;
   let strikes = $state(0);
 
   const firstChars = [...'Sergio'].map((char, index) => ({ id: `f-${index}`, char }));
@@ -31,23 +35,65 @@
     const stage = node.querySelector<HTMLElement>('[data-hero-stage]');
     const video = node.querySelector<HTMLVideoElement>('[data-hero-session-picture]');
     const soundtrack = node.querySelector<HTMLAudioElement>('[data-hero-soundtrack]');
-    if (!stage || !video || !soundtrack) return;
+    const cutaway = node.querySelector<HTMLVideoElement>('[data-hero-flow-picture]');
+    if (!stage || !video || !soundtrack || !cutaway) return;
 
     rootEl = node;
-    const playback = mountHeroPerformance(stage, video, soundtrack, (playing) => { soundPlaying = playing; });
+    let sequence: ReturnType<typeof heroSequence>;
+    let introTimer = 0;
+    let minimumElapsed = false;
+    const playback = mountHeroPerformance(stage, video, soundtrack, (playing) => {
+      soundPlaying = playing;
+      if (playing && minimumElapsed) finishIntro?.();
+    }, cutaway);
     transport = playback;
-    const sequence = heroSequence(node, { sweepCymbal, onPictureChange: playback.setPictureActive });
+
+    function startSequence() {
+      sequence = heroSequence(node, {
+        sweepCymbal,
+        onPictureChange: playback.setPictureActive,
+        onCutawayChange: playback.setCutawayActive,
+      });
+    }
+
+    const deepLink = location.hash && location.hash !== '#top';
+    if (!deepLink && window.scrollY < 24 && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      introOpen = true;
+      finishIntro = () => {
+        finishIntro = undefined;
+        window.clearTimeout(introTimer);
+        introOpen = false;
+        startSequence();
+      };
+      introTimer = window.setTimeout(() => {
+        minimumElapsed = true;
+        if (soundPlaying) finishIntro?.();
+      }, 1100);
+    } else {
+      startSequence();
+    }
 
     return () => {
+      window.clearTimeout(introTimer);
+      finishIntro = undefined;
+      introOpen = false;
       sequence?.destroy?.();
       playback.destroy();
       audio?.destroy();
+      audio = undefined;
       rootEl = undefined;
       transport = undefined;
     };
   };
 
   $effect(() => transport?.setBlocked(filmBlocked));
+
+  function enterSite(withSound: boolean) {
+    if (!finishIntro) return;
+    transport?.setSound(withSound);
+    finishIntro();
+    void tick().then(() => rootEl?.querySelector<HTMLElement>('#hero-title')?.focus({ preventScroll: true }));
+  }
 
   function strike() {
     if (rootEl) document.dispatchEvent(new CustomEvent('sergio:audio-focus', { detail: rootEl }));
@@ -68,6 +114,7 @@
   aria-labelledby="hero-title"
 >
   <h1 class="hero-accessible-title" id="hero-title" tabindex="-1">Sergio Bellotti</h1>
+  <ArtistLoader open={introOpen} {soundPlaying} onenter={enterSite} />
   <audio data-hero-soundtrack src={heroSession.soundtrack} preload="none" loop></audio>
   <div class="hero-stage" data-hero-stage>
     <div class="hero-session" data-hero-session data-hero-video aria-hidden="true">
@@ -75,6 +122,17 @@
         data-hero-session-picture
         src={heroSession.picture}
         poster={heroSession.poster}
+        muted
+        playsinline
+        preload="none"
+        loop
+      ></video>
+    </div>
+    <div class="hero-flow-cutaway" data-hero-flow data-hero-video aria-hidden="true">
+      <video
+        data-hero-flow-picture
+        src="/videos/sergio-flow-insert.mp4"
+        poster="/videos/sergio-flow-insert-poster.webp"
         muted
         playsinline
         preload="none"
@@ -104,19 +162,15 @@
         {/key}
       {/if}
       <div class="hero-poster-vignette"></div>
-      <div class="hero-name" data-hero-type>
-        <ArtistOpening />
-        <span class="hero-name-first" aria-hidden="true">
-          <span class="hero-name-mask" data-hero-name-line>
-            {#each firstChars as item (item.id)}<span class="hero-char" data-hero-char>{item.char}</span>{/each}
-          </span>
-        </span>
-        <span class="hero-name-last" aria-hidden="true">
-          <span class="hero-name-mask" data-hero-name-line>
-            {#each lastChars as item (item.id)}<span class="hero-char" data-hero-char>{item.char}</span>{/each}
-          </span>
-        </span>
-      </div>
+    </div>
+    <div class="hero-name" data-hero-type>
+      <ArtistOpening />
+      <span class="hero-name-first" aria-hidden="true">
+        {#each firstChars as item (item.id)}<span class="hero-char" data-hero-char>{item.char}</span>{/each}
+      </span>
+      <span class="hero-name-last" aria-hidden="true">
+        {#each lastChars as item (item.id)}<span class="hero-char" data-hero-char>{item.char}</span>{/each}
+      </span>
     </div>
 
     {#each heroChapters as chapter (chapter.id)}
@@ -139,10 +193,10 @@
           <div class="hero-chapter-grade" aria-hidden="true"></div>
         {/if}
         <div class="hero-chapter-copy">
-          <h2 class="hero-film-line" id={`hero-chapter-${chapter.id}`}><span data-chapter-line>{chapter.title}</span></h2>
-          <p class="hero-film-line"><span data-chapter-line>{chapter.copy}</span></p>
+          <h2 id={`hero-chapter-${chapter.id}`} data-chapter-line>{chapter.title}</h2>
+          <p data-chapter-line>{chapter.copy}</p>
           {#if chapter.id === 'discovery'}
-            <a href="#hear-the-difference" data-chapter-link>Try the ghost-note comparison</a>
+            <a href="#hear-the-difference" data-chapter-line>Try the ghost-note comparison</a>
           {/if}
         </div>
       </section>
@@ -150,9 +204,9 @@
 
     <div class="hero-finale" data-hero-finale aria-hidden="true" inert>
       <div class="hero-finale-title" data-hero-finale-title>
-        <p class="hero-film-label hero-film-line"><span data-hero-film-line>Release · Studio performance</span></p>
-        <p class="hero-film-line"><span data-hero-film-line>Happy People 7/4</span></p>
-        <p class="hero-film-copy hero-film-line"><span data-hero-film-line>Seven beats to the bar.</span></p>
+        <p class="hero-film-label" data-hero-film-line>Release · Studio performance</p>
+        <p class="hero-film-heading" data-hero-film-line>Happy People 7/4</p>
+        <p class="hero-film-copy" data-hero-film-line>Seven beats to the bar.</p>
       </div>
     </div>
 
@@ -175,7 +229,7 @@
       </div>
 
       <div class="hero-actions">
-        <button class="hero-sound" type="button" aria-label={soundPlaying ? 'Mute soundtrack' : 'Play soundtrack'} onclick={() => transport?.toggleSound()}>
+        <button class="hero-sound" type="button" aria-label={soundPlaying ? 'Mute soundtrack' : 'Play soundtrack'} onclick={() => transport?.setSound(!soundPlaying)}>
           {#if soundPlaying}<SpeakerHighIcon size={18} />{:else}<SpeakerSlashIcon size={18} />{/if}
           <span>Sound {soundPlaying ? 'on' : 'off'}</span>
         </button>

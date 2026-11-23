@@ -7,10 +7,12 @@ export function mountHeroPerformance(
   video: HTMLVideoElement,
   audio: HTMLAudioElement,
   onSoundChange: (playing: boolean) => void,
+  flow: HTMLVideoElement,
 ) {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let stageVisible = false;
   let pictureActive = false;
+  let cutawayActive = false;
   let blocked = false;
   let soundChoice: 'auto' | 'on' | 'off' = 'auto';
   let needsGesture = false;
@@ -22,6 +24,8 @@ export function mountHeroPerformance(
   video.defaultMuted = true;
   video.muted = true;
   video.preload = reducedMotion.matches ? 'none' : 'metadata';
+  flow.defaultMuted = true;
+  flow.muted = true;
 
   const onStage = () => stageVisible && !blocked && !document.hidden;
   const mayPlaySound = () => onStage() && soundChoice !== 'off' &&
@@ -75,11 +79,14 @@ export function mountHeroPerformance(
   function updatePicture() {
     if (!onStage() || !pictureActive || reducedMotion.matches) {
       video.pause();
+      flow.pause();
       return;
     }
 
     alignPicture();
     if (video.paused && !video.ended) void video.play().catch(() => {});
+    if (!cutawayActive) flow.pause();
+    else if (flow.paused) void flow.play().catch(() => {});
   }
 
   function update() {
@@ -130,6 +137,20 @@ export function mountHeroPerformance(
     playSound(true);
   }
 
+  function setSound(enabled: boolean) {
+    if (!enabled) {
+      soundChoice = 'off';
+      pauseSound();
+      return;
+    }
+
+    soundChoice = 'on';
+    if (soundPlaying) return;
+    if (pendingSound) pauseSound();
+    needsGesture = false;
+    playSound(true);
+  }
+
   const visibility = new IntersectionObserver(([entry]) => {
     stageVisible = entry.isIntersecting && entry.intersectionRatio >= 0.55;
     update();
@@ -152,23 +173,17 @@ export function mountHeroPerformance(
       pictureActive = active;
       updatePicture();
     },
+    setCutawayActive(active: boolean) {
+      if (cutawayActive === active) return;
+      cutawayActive = active;
+      updatePicture();
+    },
     setBlocked(nextBlocked: boolean) {
       if (blocked === nextBlocked) return;
       blocked = nextBlocked;
       update();
     },
-    toggleSound() {
-      if (soundPlaying) {
-        soundChoice = 'off';
-        pauseSound();
-        return;
-      }
-
-      if (pendingSound) pauseSound();
-      soundChoice = 'on';
-      needsGesture = false;
-      playSound(true);
-    },
+    setSound,
     destroy() {
       visibility.disconnect();
       document.removeEventListener('visibilitychange', update);
@@ -182,6 +197,7 @@ export function mountHeroPerformance(
       audio.removeEventListener('timeupdate', alignPicture);
       video.removeEventListener('canplay', updatePicture);
       video.pause();
+      flow.pause();
       pauseSound();
     },
   };

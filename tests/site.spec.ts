@@ -1,7 +1,35 @@
 import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
+
+function artistIntro(page: Page) {
+  return page.getByRole('dialog', { name: 'Sergio Bellotti', exact: true });
+}
+
+async function skipArtistIntro(page: Page) {
+  const intro = artistIntro(page);
+  await intro.getByRole('button', { name: 'Skip intro' }).click();
+  await expect(intro).toBeHidden();
+  await expect(page.locator('[data-hero-soundtrack]')).toHaveJSProperty('paused', true);
+}
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    // Cover the browser path that requires an explicit gesture for this soundtrack.
+    const play = HTMLMediaElement.prototype.play;
+    let receivedClick = false;
+    document.addEventListener('click', (event) => { receivedClick ||= event.isTrusted; }, { capture: true });
+    HTMLMediaElement.prototype.play = function () {
+      if (this.matches('[data-hero-soundtrack]') && !receivedClick) {
+        return Promise.reject(new DOMException('A user gesture is required.', 'NotAllowedError'));
+      }
+      return play.call(this);
+    };
+  });
+});
 
 test('loads all five editorial pages with working navigation', async ({ page }) => {
   await page.goto('/');
+  await skipArtistIntro(page);
   await expect(page.getByRole('heading', { level: 1 })).toHaveAccessibleName('Sergio Bellotti');
   const nav = page.getByRole('navigation', { name: 'Primary' });
   const routes = [
@@ -20,6 +48,7 @@ test('loads all five editorial pages with working navigation', async ({ page }) 
 
 test('opens, navigates, and closes the gallery with the keyboard', async ({ page }) => {
   await page.goto('/');
+  await skipArtistIntro(page);
   const trigger = page.getByRole('link', { name: 'Enlarge photograph: On the kit' });
   await trigger.click();
   const dialog = page.getByRole('dialog');
@@ -34,6 +63,7 @@ test('opens, navigates, and closes the gallery with the keyboard', async ({ page
 
 test('activates video on demand and restores focus', async ({ page }) => {
   await page.goto('/');
+  await skipArtistIntro(page);
   const trigger = page.getByRole('link', { name: 'Watch performance' });
   const dialog = page.getByRole('dialog', { name: 'Happy People 7/4' });
   await trigger.click();
@@ -50,6 +80,7 @@ test('mobile menu works and reduced-motion layout stays within the viewport', as
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
+  await expect(artistIntro(page)).toBeHidden();
   const menu = page.getByRole('button', { name: 'Open menu' });
   await menu.click();
   const shown = page.getByRole('button', { name: 'Close menu' });
@@ -68,19 +99,52 @@ test('mobile menu works and reduced-motion layout stays within the viewport', as
 test('the inline opening runs on reload with navigation and Watch performance enabled', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/');
+  await skipArtistIntro(page);
   const opening = page.getByText('The Notes Between', { exact: true }).locator('..');
   await expect(opening).toHaveAttribute('data-opening-motion', 'active');
   await expect(page.getByRole('link', { name: 'Watch performance' })).toBeEnabled();
   await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
   await page.reload();
+  await skipArtistIntro(page);
   await expect(opening).toHaveAttribute('data-opening-motion', 'active');
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('the opening lets visitors enter with sound', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/');
+  const intro = artistIntro(page);
+  const soundtrack = page.locator('[data-hero-soundtrack]');
+  await expect(intro).toBeVisible();
+  await expect(soundtrack).toHaveJSProperty('paused', true);
+  await intro.getByRole('button', { name: 'Enter with sound' }).click();
+  await expect(intro).toBeHidden();
+  await expect(soundtrack).toHaveJSProperty('paused', false);
+  await expect(page.getByRole('button', { name: 'Mute soundtrack' })).toBeVisible();
+});
+
+test('Escape skips the intro and leaves the soundtrack muted', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/');
+  const intro = artistIntro(page);
+  await expect(intro).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(intro).toBeHidden();
+  await expect(page.locator('[data-hero-soundtrack]')).toHaveJSProperty('paused', true);
+  await expect(page.getByRole('button', { name: 'Play soundtrack' })).toBeVisible();
+});
+
+test('the intro is bypassed on a direct link to a homepage section', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/#hear-the-difference');
+  await expect(page.locator('[data-hero-sequence]')).toHaveAttribute('data-cinematic', 'true');
+  await expect(artistIntro(page)).toBeHidden();
 });
 
 test('hero keeps the session playing across chapters and holds the quiet notes before reversing', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/');
+  await skipArtistIntro(page);
   const hero = page.locator('[data-hero-sequence]');
   const poster = hero.locator('[data-hero-poster]');
   const chapters = hero.locator('[data-hero-chapter]');
@@ -88,6 +152,7 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
   const discovery = hero.locator('[data-hero-chapter=discovery]');
   const film = hero.locator('[data-hero-finale]');
   const picture = hero.locator('[data-hero-session-picture]');
+  const flowPicture = hero.locator('[data-hero-flow-picture]');
   const soundtrack = hero.locator('[data-hero-soundtrack]');
   const sound = hero.getByRole('button', { name: /^(Play|Mute) soundtrack$/ });
   const playSound = hero.getByRole('button', { name: 'Play soundtrack' });
@@ -121,6 +186,8 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
   await expect(picture).toHaveJSProperty('paused', true);
   await expect(picture).toHaveJSProperty('muted', true);
   await expect(picture).toHaveJSProperty('loop', true);
+  await expect(flowPicture).toHaveAttribute('src', '/videos/sergio-flow-insert.mp4');
+  await expect(flowPicture).toHaveJSProperty('muted', true);
   await expect(soundtrack).toHaveJSProperty('loop', true);
   await expect(sound).toBeVisible();
   await page.evaluate(() => document.fonts.ready.then(() => {}));
@@ -134,6 +201,9 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
   await visitChapter(.18, 'groove', 'Groove');
   await expect(picture).toHaveJSProperty('paused', false);
   await expect.poll(pictureTime).toBeGreaterThan(.8);
+  await playSound.click();
+  await expect(muteSound).toBeVisible();
+  await expect(soundtrack).toHaveJSProperty('paused', false);
   const sessionPicture = await picture.elementHandle();
   let lastPosition = await pictureTime();
 
@@ -145,6 +215,11 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
     [.67, 'anticipation', 'Before the hit'],
   ] as const) {
     await visitChapter(position, scene, title);
+    if (scene === 'flow') {
+      await expect(flowPicture).toHaveJSProperty('paused', false);
+      await expect.poll(() => flowPicture.evaluate((video: HTMLVideoElement) => video.currentTime)).toBeGreaterThan(.1);
+      await expect(soundtrack).toHaveJSProperty('paused', false);
+    }
     await expect(picture).toHaveJSProperty('paused', false);
     expect(await picture.evaluate((video, original) => video === original, sessionPicture)).toBe(true);
     const positionInFilm = await pictureTime();
@@ -158,13 +233,10 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
   await expect(discovery).toBeHidden();
   await expect(picture).toHaveCSS('object-fit', 'contain');
   await expect(picture).toHaveJSProperty('paused', false);
+  await expect(flowPicture).toHaveJSProperty('paused', true);
   expect(await picture.evaluate((video, original) => video === original, sessionPicture)).toBe(true);
   expect(await pictureTime()).toBeGreaterThanOrEqual(lastPosition - .35);
 
-  if (await muteSound.isVisible()) await muteSound.click();
-  await expect(soundtrack).toHaveJSProperty('paused', true);
-  await playSound.click();
-  await expect(muteSound).toBeVisible();
   await expect(soundtrack).toHaveJSProperty('paused', false);
   await expect(picture).toHaveJSProperty('muted', true);
   await expect.poll(() => hero.evaluate((element) => {
@@ -198,6 +270,7 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
 
 test('cymbal responds to a keyboard strike with the graphical fallback available', async ({ page }) => {
   await page.goto('/');
+  await skipArtistIntro(page);
   const strike = page.getByRole('button', { name: 'Strike the cymbal' });
   await strike.focus();
   await page.keyboard.press('Enter');

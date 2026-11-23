@@ -1,13 +1,23 @@
 import type { Action } from 'svelte/action';
-import { heroChapters, performanceStart } from '#lib/components/hero-chapters';
+import { heroChapters, performanceStart, widePerformanceFraming, type HeroFraming } from '#lib/components/hero-chapters';
 
 const motionQuery = '(prefers-reduced-motion: no-preference) and (min-height: 35rem)';
 const openingDissolve = .048;
 const closingDissolve = .064;
 
+function framingStyles(framing: HeroFraming) {
+  return {
+    '--session-scale': framing.scale,
+    '--session-pan': `${framing.xPercent}%`,
+    '--session-rise': `${framing.yPercent}%`,
+    '--session-shade': framing.shade,
+  };
+}
+
 export interface HeroSequenceOptions {
   sweepCymbal?: (progress: number) => void;
   onPictureChange?: (active: boolean) => void;
+  onCutawayChange?: (active: boolean) => void;
 }
 
 export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, options = {}) => {
@@ -15,6 +25,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
   const portrait = element('poster');
   const backdrop = element('backdrop');
   const session = element('session');
+  const cutaway = element('flow');
   const type = element('type');
   const details = element('details');
   const light = element('rim');
@@ -52,7 +63,8 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
     const chars = type.querySelectorAll<HTMLElement>('[data-hero-char]');
     const metaLines = details.querySelectorAll<HTMLElement>('[data-hero-meta-line]');
     const backdropImg = backdrop.querySelector<HTMLImageElement>('img');
-    const filmLines = caption.querySelectorAll<HTMLElement>('[data-hero-film-line]');
+    const filmWords = [...caption.querySelectorAll<HTMLElement>('[data-hero-film-word]')];
+    const filmLines = [...caption.querySelectorAll<HTMLElement>('[data-hero-film-line]')];
 
     gsap.registerPlugin(ScrollTrigger);
     const queries = gsap.matchMedia(root);
@@ -63,6 +75,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
       const illumination = { progress: 0 };
       const openingSweep = { progress: 0 };
       let pictureActive = false;
+      let cutawayActive = false;
       let activeChapter: HTMLElement | undefined;
       let velocityDecay = 0;
 
@@ -111,13 +124,41 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         }, 0.16);
       }
 
-      // Base states: smooth optical stacking, zero harsh clip-path wipes
       gsap.set(chapters, { autoAlpha: 0 });
       gsap.set(film, { autoAlpha: 0 });
-      gsap.set(session, { autoAlpha: 0 });
-      gsap.set(filmLines, { yPercent: 108, autoAlpha: 0 });
+      gsap.set(session, { autoAlpha: 0, ...framingStyles(widePerformanceFraming) });
+      if (cutaway) gsap.set(cutaway, { autoAlpha: 0 });
 
       const timeline = gsap.timeline({ paused: true, defaults: { ease: 'none' } });
+
+      function revealCaption(words: HTMLElement[], lines: HTMLElement[], start: number, slow = false) {
+        if (words.length) {
+          gsap.set(words, { yPercent: 112, xPercent: 3, skewY: 2.2, autoAlpha: 0 });
+          timeline.to(words, {
+            yPercent: 0, xPercent: 0, skewY: 0, autoAlpha: 1,
+            duration: slow ? 0.046 : 0.033, stagger: slow ? 0.006 : 0.004, ease: 'power4.out',
+          }, start);
+        }
+        if (lines.length) {
+          gsap.set(lines, { y: 12, autoAlpha: 0 });
+          timeline.to(lines, {
+            y: 0, autoAlpha: 1,
+            duration: slow ? 0.043 : 0.03, stagger: 0.004, ease: 'power2.out',
+          }, start + (words.length ? 0.016 : 0));
+        }
+      }
+
+      function exitCaption(words: HTMLElement[], lines: HTMLElement[], end: number) {
+        if (lines.length) {
+          timeline.to(lines, { y: -8, autoAlpha: 0, duration: 0.017, ease: 'power2.in' }, end - 0.026);
+        }
+        if (words.length) {
+          timeline.to(words, {
+            yPercent: -106, xPercent: -1.25, skewY: -1.2, autoAlpha: 0,
+            duration: 0.021, stagger: 0.002, ease: 'power2.in',
+          }, end - 0.023);
+        }
+      }
 
       // Opening portrait: slow Steadicam push anchored near Sergio's eyes (zero head clip) + parting credits
       timeline
@@ -142,51 +183,38 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         .set(session, { autoAlpha: 1 }, heroChapters[0].start)
         .to(portrait, { autoAlpha: 0, duration: openingDissolve, ease: 'sine.inOut' }, heroChapters[0].start);
 
-      // Theatrical dip-through-darkroom optical transitions across all 7 chapters
+      // The moving picture keeps its own time. Scroll cues only change its framing and captions.
       for (const [index, chapter] of chapters.entries()) {
         const { start, id, framing } = heroChapters[index];
-        const incomingLines = chapter.querySelectorAll<HTMLElement>('[data-chapter-line]');
+        const words = [...chapter.querySelectorAll<HTMLElement>('[data-chapter-word]')];
+        const lines = [...chapter.querySelectorAll<HTMLElement>('[data-chapter-line]')];
         const plate = chapter.querySelector<HTMLElement>('[data-chapter-plate]');
         const link = chapter.querySelectorAll<HTMLElement>('[data-chapter-link]');
         const nextStart = id === 'anticipation' ? performanceStart : heroChapters[index + 1]?.start ?? 1;
-        const captionStart = index === 0 ? start + 0.024 : start + 0.014;
+        const closing = chapter === discovery;
+        const captionStart = start + (index === 0 || closing ? 0.022 : 0.013);
 
         chapter.style.zIndex = String(10 + index);
-        gsap.set(incomingLines, { yPercent: 108, autoAlpha: 0 });
-
-        if (id === 'groove' || chapter === discovery) {
-          timeline.to(chapter, {
-            autoAlpha: 1,
-            duration: chapter === discovery ? closingDissolve : openingDissolve,
-            ease: 'sine.inOut',
-          }, start);
-        } else {
-          timeline
-            .fromTo(
-              veil,
-              { opacity: 0 },
-              { opacity: 0.45, duration: 0.015, ease: 'power2.in', immediateRender: false },
-              start - 0.015
-            )
-            .to(chapter, {
-              autoAlpha: 1,
-              duration: 0.022,
-              ease: 'power2.out',
-            }, start)
-            .to(veil, {
-              opacity: 0,
-              duration: 0.022,
-              ease: 'power2.out',
-            }, start + 0.004);
-        }
+        timeline.to(chapter, {
+          autoAlpha: 1, duration: closing ? closingDissolve : 0.024, ease: 'sine.inOut',
+        }, start);
 
         if (framing) {
           timeline.to(session, {
-            '--session-scale': framing.scale,
-            '--session-pan': `${framing.xPercent}%`,
-            duration: 0.026,
-            ease: 'sine.out',
+            ...framingStyles(framing), duration: 0.046, ease: 'power2.inOut',
           }, start);
+        }
+
+        if (id === 'flow' && cutaway) {
+          timeline
+            .to(cutaway, { autoAlpha: 1, duration: 0.034, ease: 'sine.inOut' }, start)
+            .to(cutaway, { autoAlpha: 0, duration: 0.028, ease: 'sine.inOut' }, nextStart - 0.012);
+        }
+
+        if (index > 0 && !closing) {
+          timeline
+            .to(veil, { opacity: 0.16, duration: 0.017, ease: 'sine.inOut' }, start - 0.008)
+            .to(veil, { opacity: 0, duration: 0.028, ease: 'sine.out' }, start + 0.009);
         }
 
         if (plate) {
@@ -195,32 +223,17 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
           }, start);
         }
 
-        timeline.to(incomingLines, {
-          yPercent: 0,
-          autoAlpha: 1,
-          duration: 0.026,
-          stagger: 0.005,
-          ease: 'power3.out',
-        }, captionStart);
+        revealCaption(words, lines, captionStart, closing);
 
-        if (chapter === discovery) {
+        if (closing) {
           chapter.style.zIndex = '24';
           gsap.set(link, { y: 12, autoAlpha: 0 });
-          timeline.to(link, { y: 0, autoAlpha: 1, duration: 0.022, ease: 'power3.out' }, start + 0.024);
+          timeline.to(link, { y: 0, autoAlpha: 1, duration: 0.029, ease: 'power3.out' }, start + 0.055);
         } else {
-          timeline
-            .to(incomingLines, {
-              yPercent: -68,
-              autoAlpha: 0,
-              duration: 0.016,
-              stagger: 0.003,
-              ease: 'power2.inOut',
-            }, nextStart - 0.018)
-            .to(chapter, {
-              autoAlpha: 0,
-              duration: id === 'anticipation' ? 0.004 : 0.014,
-              ease: 'power2.in',
-            }, nextStart - (id === 'anticipation' ? 0 : 0.008));
+          exitCaption(words, lines, nextStart);
+          timeline.to(chapter, {
+            autoAlpha: 0, duration: 0.017, ease: 'power2.inOut',
+          }, nextStart - 0.007);
         }
       }
 
@@ -230,20 +243,16 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         .fromTo(
           cutLight,
           { opacity: 0, scale: 0.92 },
-          { opacity: 0.52, scale: 1.04, duration: 0.036, ease: 'sine.inOut', immediateRender: false },
-          performanceStart - 0.028
+          { opacity: 0.34, scale: 1.04, duration: 0.027, ease: 'sine.inOut', immediateRender: false },
+          performanceStart - 0.022
         )
         .set(film, { autoAlpha: 1 }, performanceStart)
-        .to(session, { '--session-scale': 1, '--session-pan': '0%', duration: 0.035, ease: 'sine.out' }, performanceStart)
-        .to(cutLight, { opacity: 0, scale: 1.12, duration: 0.048, ease: 'power2.out' }, performanceStart + 0.008)
-        .to(filmLines, {
-          yPercent: 0, autoAlpha: 1, duration: 0.032, stagger: 0.006, ease: 'power3.out',
-        }, performanceStart + 0.020)
-        .to(filmLines, {
-          yPercent: -72, autoAlpha: 0, duration: 0.024, stagger: 0.004, ease: 'power2.inOut',
-        }, discoveryStart - 0.024)
+        .to(session, { ...framingStyles(widePerformanceFraming), duration: 0.051, ease: 'sine.inOut' }, performanceStart)
+        .to(cutLight, { opacity: 0, scale: 1.12, duration: 0.042, ease: 'sine.out' }, performanceStart + 0.005)
         .set(film, { autoAlpha: 0 }, discoveryStart + closingDissolve)
         .set(session, { autoAlpha: 0 }, discoveryStart + closingDissolve);
+      revealCaption(filmWords, filmLines, performanceStart + 0.016);
+      exitCaption(filmWords, filmLines, discoveryStart);
 
       function sync() {
         const progress = timeline.progress();
@@ -281,6 +290,11 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
           pictureActive = nextPicture;
           options.onPictureChange?.(pictureActive);
         }
+        const nextCutaway = Boolean(cutaway && scene === 'flow');
+        if (nextCutaway !== cutawayActive) {
+          cutawayActive = nextCutaway;
+          options.onCutawayChange?.(cutawayActive);
+        }
         film.inert = !inFilm;
         film.setAttribute('aria-hidden', String(!inFilm));
       }
@@ -314,6 +328,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         window.clearTimeout(velocityDecay);
         introTimeline?.kill();
         options.onPictureChange?.(false);
+        options.onCutawayChange?.(false);
         if (activeChapter) {
           activeChapter.inert = true;
           delete activeChapter.dataset.shotActive;
