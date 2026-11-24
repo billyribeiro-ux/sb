@@ -15,7 +15,7 @@
   }
 
   $effect(() => {
-    if (arrivalDuration) playOpening(arrivalDuration + 500);
+    if (arrivalDuration) playOpening(arrivalDuration + 900);
   });
 
   afterNavigate(({ type, to }) => {

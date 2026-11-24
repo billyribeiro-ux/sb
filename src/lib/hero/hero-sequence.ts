@@ -152,7 +152,8 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
       const sessionReveal = openingStart * .38;
       const openingBlendStart = openingStart - .024;
       const openingBlendEnd = openingStart + .065;
-      const sessionPlayback = editedOpening ? openingStart : openingBlendStart - .026;
+      const openingHandoff = editedOpening ? openingStart * .72 : openingStart;
+      const sessionPlayback = editedOpening ? openingHandoff : openingBlendStart - .026;
       const grooveCaptionStart = openingStart - (editedOpening ? .048 : captionLead);
       const closingEnd = discoveryStart + closingTail;
       const typeTravel = gsap.utils.clamp(44, 76, window.innerHeight * .085);
@@ -430,8 +431,8 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         // The pullback and first performance angle are frames of the same edit.
         timeline
           .set(session, { autoAlpha: 1, '--session-live-opacity': 1, '--session-shade': 0 }, 0)
-          .to(portrait, { '--hero-opening-grade': 0, duration: openingStart * .66, ease: 'sine.inOut' }, openingStart * .34)
-          .set(portrait, { autoAlpha: 0 }, openingStart);
+          .to(portrait, { '--hero-opening-grade': 0, duration: openingHandoff * .66, ease: 'sine.inOut' }, openingHandoff * .34)
+          .set(portrait, { autoAlpha: 0 }, openingHandoff);
       } else {
         timeline
           .to(illumination, { progress: 1, duration: openingStart, ease: 'sine.inOut' }, 0)
@@ -535,7 +536,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
 
       function sync() {
         const progress = timeline.progress();
-        options.onOpeningProgress?.(progress / openingStart);
+        options.onOpeningProgress?.(progress / openingHandoff);
         if (progress > 0.015 && introTimeline?.isActive()) {
           introTimeline.progress(1);
         }

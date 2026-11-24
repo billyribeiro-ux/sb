@@ -41,7 +41,7 @@
   let beginIntro: (() => void) | undefined;
   let finishIntro: (() => void) | undefined;
   let strikes = $state(0);
-  const arrivalDuration = 2200;
+  const arrivalDuration = 1300;
 
   const firstChars = [...'Sergio'].map((char, index) => ({ id: `f-${index}`, char }));
   const lastChars = [...'Bellotti'].map((char, index) => ({ id: `l-${index}`, char }));

@@ -170,7 +170,7 @@ test('the opening lets visitors enter with sound', async ({ page }) => {
   const frame = hero.locator('[data-hero-backdrop]');
   await expect(hero).toHaveAttribute('data-intro-phase', 'revealing');
   await expect(frame).toHaveCSS('animation-name', 'hero-arrival-image');
-  await expect(frame).toHaveCSS('animation-duration', '2.2s');
+  await expect(frame).toHaveCSS('animation-duration', '1.3s');
   await expect(frame).not.toHaveCSS('transform', 'none');
 
   await expect(hero).toHaveAttribute('data-cinematic', 'true');
@@ -260,7 +260,7 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
   await expect(sabian).toBeVisible();
   await expect(yamaha).toBeHidden();
 
-  await seekHero(hero, .22);
+  await seekHero(hero, .18);
   await expect(sabian).toBeHidden();
   await expect(hero).toHaveAttribute('data-scene', 'portrait');
   await expect(poster).toHaveCSS('opacity', '1');
