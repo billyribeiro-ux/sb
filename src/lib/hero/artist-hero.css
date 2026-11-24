@@ -222,6 +222,7 @@
 
 .hero-sponsor-scene--sabian { top: clamp(8rem, 24svh, 14rem); left: 61%; }
 .hero-sponsor-scene--yamaha { top: 52%; left: 58%; }
+.hero-sponsor-scene--remo, .hero-sponsor-scene--prologix { top: 48%; right: 6%; }
 
 .hero-sponsor-lockup {
   position: relative;
@@ -275,6 +276,9 @@
 
 .hero-sponsor-scene .hero-sponsor-logo--sabian { width: clamp(12rem, 18vw, 18rem); }
 .hero-sponsor-scene .hero-sponsor-logo--yamaha { width: clamp(13rem, 20vw, 20rem); }
+.hero-sponsor-scene .hero-sponsor-logo--remo,
+.hero-sponsor-scene .hero-sponsor-logo--prologix { width: clamp(11rem, 16vw, 16rem); }
+.hero-sponsor-scene .hero-sponsor-logo--remo { filter: none; }
 
 .hero-sponsor-flare {
   position: absolute;
@@ -327,13 +331,17 @@
 @media (max-width: 850px), (max-aspect-ratio: 5/4) {
   .hero-sponsor-scene--sabian { top: 24%; left: auto; right: var(--gutter); }
   .hero-sponsor-scene--yamaha { top: 45%; left: auto; right: var(--gutter); }
+  .hero-sponsor-scene--remo, .hero-sponsor-scene--prologix { top: 42%; right: var(--gutter); }
   .hero-sponsor-scene .hero-sponsor-logo--sabian { width: 12rem; }
   .hero-sponsor-scene .hero-sponsor-logo--yamaha { width: 12.5rem; }
+  .hero-sponsor-scene .hero-sponsor-logo--remo,
+  .hero-sponsor-scene .hero-sponsor-logo--prologix { width: 11rem; }
 }
 
 @media (max-width: 600px) {
   .hero-sponsor-scene--sabian { top: 22%; right: 1rem; }
   .hero-sponsor-scene--yamaha { top: 43%; right: 1rem; }
+  .hero-sponsor-scene--remo, .hero-sponsor-scene--prologix { top: 40%; right: 1rem; }
   .hero-sponsor-connector { top: 1.25rem; right: calc(100% + .5rem); width: 1.5rem; }
   .hero-sponsor-descriptor { font-size: .62rem; }
 }

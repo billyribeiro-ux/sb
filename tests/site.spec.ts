@@ -249,7 +249,7 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
   const sponsorScenes = hero.locator('[data-hero-sponsor-scene]');
   const sabian = hero.locator('[data-hero-sponsor-scene="sabian"]');
   const yamaha = hero.locator('[data-hero-sponsor-scene="yamaha"]');
-  await expect(sponsorScenes).toHaveCount(2);
+  await expect(sponsorScenes).toHaveCount(4);
   await expect(sabian).toBeHidden();
   await expect(yamaha).toBeHidden();
   await expect.poll(() => sponsorScenes.locator('img').evaluateAll((logos) =>
@@ -354,6 +354,8 @@ test('sponsor entrances complete and exits wait for their own triggers', async (
   const hero = page.locator('[data-hero-sequence]');
   const sabian = hero.locator('[data-hero-sponsor-scene="sabian"]');
   const yamaha = hero.locator('[data-hero-sponsor-scene="yamaha"]');
+  const remo = hero.locator('[data-hero-sponsor-scene="remo"]');
+  const prologix = hero.locator('[data-hero-sponsor-scene="prologix"]');
 
   await seekHero(hero, .04);
   await expect(sabian).toBeVisible();
@@ -373,6 +375,24 @@ test('sponsor entrances complete and exits wait for their own triggers', async (
 
   await seekHero(hero, .35);
   await expect(yamaha).toBeHidden({ timeout: 6000 });
+
+  await seekHero(hero, .47);
+  await expect(remo).toBeVisible();
+  await expect(prologix).toBeHidden();
+  await page.waitForTimeout(3000);
+  await expect(remo).toBeVisible();
+
+  await seekHero(hero, .54);
+  await expect(remo).toBeHidden({ timeout: 6000 });
+  await expect(prologix).toBeHidden();
+
+  await seekHero(hero, .77);
+  await expect(prologix).toBeVisible();
+  await page.waitForTimeout(3000);
+  await expect(prologix).toBeVisible();
+
+  await seekHero(hero, .85);
+  await expect(prologix).toBeHidden({ timeout: 6000 });
 });
 
 test('chapter captions remain visible until their individual exit triggers', async ({ page }) => {
@@ -472,8 +492,8 @@ test('explicit hero sound works with reduced motion and static chapters', async 
   const soundtrack = page.locator('[data-hero-soundtrack]');
   await expect(page.getByRole('heading', { name: 'Seven movements. One performance.' })).toBeVisible();
   await expect(page.locator('.hero-static-chapter')).toHaveCount(7);
-  await expect(page.locator('.hero-static-sponsors')).toHaveAccessibleName('Sponsored by Yamaha Drums and Sabian Cymbals');
-  await expect(page.locator('.hero-static-sponsors img')).toHaveCount(2);
+  await expect(page.locator('.hero-static-sponsors')).toHaveAccessibleName('Sponsored by Sabian Cymbals, Yamaha Drums, Remo Drumheads, and ProLogix Practice Pads');
+  await expect(page.locator('.hero-static-sponsors img')).toHaveCount(4);
   await page.getByRole('button', { name: 'Play soundtrack' }).click();
   await expect(page.getByRole('button', { name: 'Mute soundtrack' })).toBeVisible();
   await expect(soundtrack).toHaveJSProperty('paused', false);

@@ -262,6 +262,25 @@
         <span class="hero-sponsor-flare" aria-hidden="true"></span>
       </div>
     </div>
+    <div class="hero-sponsor-scene hero-sponsor-scene--remo" data-hero-sponsor-scene="remo">
+      <span class="hero-sponsor-connector" aria-hidden="true"></span>
+      <div class="hero-sponsor-lockup">
+        <span class="hero-sponsor-shockwave" aria-hidden="true"></span>
+        <img class="hero-sponsor-logo hero-sponsor-logo--remo" src="/images/remo-logo.svg" alt="Remo" width="224" height="85" />
+        <span class="hero-sponsor-descriptor">Drumheads</span>
+        <span class="hero-sponsor-flare" aria-hidden="true"></span>
+      </div>
+    </div>
+    <div class="hero-sponsor-scene hero-sponsor-scene--prologix" data-hero-sponsor-scene="prologix">
+      <span class="hero-sponsor-connector" aria-hidden="true"></span>
+      <div class="hero-sponsor-lockup">
+        <img class="hero-sponsor-echo hero-sponsor-logo--prologix" src="/images/prologix-logo.png" alt="" aria-hidden="true" width="224" height="81" />
+        <span class="hero-sponsor-shockwave" aria-hidden="true"></span>
+        <img class="hero-sponsor-logo hero-sponsor-logo--prologix" src="/images/prologix-logo.png" alt="ProLogix" width="224" height="81" />
+        <span class="hero-sponsor-descriptor">Practice pads</span>
+        <span class="hero-sponsor-flare" aria-hidden="true"></span>
+      </div>
+    </div>
 
     {#each heroChapters as chapter (chapter.id)}
       <section
@@ -353,10 +372,12 @@
     <div class="hero-static-heading">
       <p>The Notes Between</p>
       <h2 id="hero-static-title">Seven movements.<br />One performance.</h2>
-      <div class="hero-static-sponsors" aria-label="Sponsored by Yamaha Drums and Sabian Cymbals">
+      <div class="hero-static-sponsors" aria-label="Sponsored by Sabian Cymbals, Yamaha Drums, Remo Drumheads, and ProLogix Practice Pads">
         <span>Sponsored by</span>
-        <img src="/images/yamaha-logo.svg" alt="Yamaha Drums" width="112" height="24" />
         <img src="/images/sabian-logo.svg" alt="Sabian Cymbals" width="112" height="35" />
+        <img src="/images/yamaha-logo.svg" alt="Yamaha Drums" width="112" height="24" />
+        <img src="/images/remo-logo.svg" alt="Remo Drumheads" width="112" height="42" />
+        <img src="/images/prologix-logo.png" alt="ProLogix Practice Pads" width="112" height="40" />
       </div>
     </div>
     {#each heroChapters as chapter, index (chapter.id)}

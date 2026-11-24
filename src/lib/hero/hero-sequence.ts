@@ -372,6 +372,14 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
             id: 'yamaha', at: .278, exitAt: .338, holdAt: 2.5,
             animation: sponsorMoment('yamaha', 1.7, .8, .9), triggered: false, queued: false, exitRequested: false,
           },
+          {
+            id: 'remo', at: .47, exitAt: .53, holdAt: 2.5,
+            animation: sponsorMoment('remo', 1.7, .8, .9), triggered: false, queued: false, exitRequested: false,
+          },
+          {
+            id: 'prologix', at: .76, exitAt: .84, holdAt: 2.5,
+            animation: sponsorMoment('prologix', 1.7, .8, .9), triggered: false, queued: false, exitRequested: false,
+          },
         ];
         type SponsorMoment = (typeof sponsorMoments)[number];
         let sponsorProgress = 0;
