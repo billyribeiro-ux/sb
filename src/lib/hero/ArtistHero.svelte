@@ -314,11 +314,6 @@
       <div class="hero-arrival-burst" aria-hidden="true"><span></span><span></span></div>
     {/if}
 
-    <div class="hero-sequence-hud" aria-hidden="true">
-      <span class="hero-scene-count" data-hero-scene-count>00 / 07</span>
-      <span class="hero-scene-name" data-hero-scene-name>Opening titles</span>
-      <span class="hero-scene-track"><span data-hero-scene-meter></span></span>
-    </div>
     <div class="hero-scroll-instruction" data-hero-scroll aria-hidden="true">
       <span>Scroll to enter the performance</span><i></i>
     </div>

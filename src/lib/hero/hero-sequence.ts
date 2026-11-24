@@ -5,8 +5,6 @@ const motionQuery = '(prefers-reduced-motion: no-preference) and (min-height: 35
 const closingLead = .032;
 const closingTail = .074;
 const captionLead = .026;
-const captionExitLead = .048;
-const captionFadeOut = .079;
 const cutawayLead = .04;
 const cutawayTail = .043;
 const cutawayIndex = heroChapters.findIndex(chapter => chapter.id === 'flow');
@@ -47,16 +45,13 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
   const flash = element('flash');
   const lightLeak = element('leak');
   const scrollInstruction = element('scroll');
-  const sceneCount = element('scene-count');
-  const sceneName = element('scene-name');
-  const sceneMeter = element('scene-meter');
   const chapters = [...root.querySelectorAll<HTMLElement>('[data-hero-chapter]')];
   if (!portrait || !backdrop || !session || !type || !details || !light ||
       !film || !caption || chapters.length !== heroChapters.length) return;
 
   const layers = {
     portrait, backdrop, session, type, details, light, film, caption,
-    flash, lightLeak, scrollInstruction, sceneCount, sceneName, sceneMeter,
+    flash, lightLeak, scrollInstruction,
   };
   const preference = window.matchMedia(motionQuery);
   let disposed = false;
@@ -71,7 +66,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
 
     const {
       portrait, backdrop, session, type, details, light, film, caption,
-      flash, lightLeak, scrollInstruction, sceneCount, sceneName, sceneMeter,
+      flash, lightLeak, scrollInstruction,
     } = layers;
     const discovery = chapters[chapters.length - 1];
     const discoveryStart = heroChapters[heroChapters.length - 1].start;
@@ -162,34 +157,87 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
       const closingEnd = discoveryStart + closingTail;
       const typeTravel = gsap.utils.clamp(44, 76, window.innerHeight * .085);
 
-      function revealCaption(lines: NodeListOf<HTMLElement>, start: number) {
+      interface CaptionMoment {
+        start: number;
+        exitAt: number | undefined;
+        animation: gsap.core.Timeline;
+        started: boolean;
+        completed: boolean;
+        exitRequested: boolean;
+      }
+
+      const captionMoments: CaptionMoment[] = [];
+
+      function captionMoment(
+        lines: NodeListOf<HTMLElement>,
+        titleChars: NodeListOf<HTMLElement> | undefined,
+        start: number,
+        exitAt: number | undefined,
+      ) {
         gsap.set(lines, {
           y: (index) => index === 0 ? typeTravel * .55 : typeTravel * .34,
           filter: 'blur(5px)', autoAlpha: 0,
         });
-        timeline.to(lines, {
+        if (titleChars) {
+          gsap.set(titleChars, { yPercent: 128, rotationX: -72, opacity: 0, transformOrigin: '0% 100%' });
+        }
+        const animation = gsap.timeline({ paused: true });
+        const moment: CaptionMoment = { start, exitAt, animation, started: false, completed: false, exitRequested: false };
+        animation.to(lines, {
           y: 0, autoAlpha: 1, filter: 'blur(0px)',
-          duration: .068, stagger: .012, ease: 'power3.out',
-        }, start);
+          duration: .65, stagger: .07, ease: 'power3.out',
+        }, 0);
+        if (titleChars?.length) {
+          animation.to(titleChars, {
+            yPercent: 0, rotationX: 0, opacity: 1,
+            duration: .8, stagger: .022, ease: 'power4.out',
+          }, .08);
+        }
+        if (exitAt !== undefined) {
+          animation.addPause(1.25, () => {
+            if (moment.exitRequested) animation.play();
+          }).to(lines, {
+            y: (index) => index === 0 ? -typeTravel * .45 : -typeTravel * .28,
+            filter: 'blur(5px)', autoAlpha: 0,
+            duration: .45, ease: 'power2.in',
+          }, 1.25);
+          if (titleChars?.length) {
+            animation.to(titleChars, {
+              yPercent: -110, rotationX: 55, opacity: 0,
+              duration: .45, stagger: .015, ease: 'power2.in',
+            }, 1.25);
+          }
+        }
+        animation.eventCallback('onComplete', () => { moment.completed = true; });
+        captionMoments.push(moment);
       }
 
-      function exitCaption(lines: NodeListOf<HTMLElement>, boundary: number) {
-        const start = boundary - captionExitLead;
-        timeline.to(lines, {
-          y: (index) => index === 0 ? -typeTravel * .45 : -typeTravel * .28,
-          filter: 'blur(5px)', autoAlpha: 0,
-          duration: captionFadeOut, ease: 'power2.in',
-        }, start);
-        return start + captionFadeOut;
+      function syncCaptions(progress: number) {
+        for (const moment of captionMoments) {
+          if (progress < moment.start) {
+            moment.started = false;
+            moment.completed = false;
+            moment.exitRequested = false;
+            moment.animation.pause(0);
+            continue;
+          }
+          if (moment.exitAt !== undefined && progress >= moment.exitAt) moment.exitRequested = true;
+          if (!moment.started) {
+            moment.started = true;
+            moment.animation.play(0);
+          } else if (!moment.completed && moment.exitRequested && moment.animation.paused()) {
+            moment.animation.play();
+          }
+        }
       }
 
-      function opticalCue(start: number, strength = .28) {
+      function opticalCue(start: number, strength = .28, queue: gsap.core.Timeline = timeline) {
         if (flash) {
-          timeline.to(flash, { autoAlpha: strength, duration: .014, ease: 'power2.in' }, start)
+          queue.to(flash, { autoAlpha: strength, duration: .014, ease: 'power2.in' }, start)
             .to(flash, { autoAlpha: 0, duration: .07, ease: 'power2.out' }, start + .014);
         }
         if (lightLeak) {
-          timeline.fromTo(lightLeak,
+          queue.fromTo(lightLeak,
             { autoAlpha: 0, xPercent: -125 },
             { autoAlpha: .72, xPercent: 340, duration: .12, ease: 'power2.inOut', immediateRender: false },
             start - .018,
@@ -197,7 +245,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         }
       }
 
-      function sponsorMoment(id: string, start: number, settled: number, exitStart: number, end: number) {
+      function sponsorMoment(id: string, entrance: number, hold: number, exit: number) {
         const scene = root.querySelector<HTMLElement>(`[data-hero-sponsor-scene="${id}"]`);
         const atmosphere = root.querySelector<HTMLElement>('[data-hero-sponsor-atmosphere]');
         const frame = root.querySelector<HTMLElement>('[data-hero-stage]');
@@ -207,8 +255,8 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         const shockwave = scene?.querySelector<HTMLElement>('.hero-sponsor-shockwave');
         const flare = scene?.querySelector<HTMLElement>('.hero-sponsor-flare');
         if (!scene) return;
-        const entrance = settled - start;
-        const exit = end - exitStart;
+        const animation = gsap.timeline({ paused: true });
+        const exitStart = entrance + hold;
         const direction = id === 'sabian' ? 1 : -1;
         const originX = frame
           ? id === 'sabian'
@@ -220,18 +268,18 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
             ? scene.offsetHeight * .15
             : frame.clientHeight * .46 - (scene.offsetTop + scene.offsetHeight * .5)
           : 0;
-        opticalCue(settled - .012, .38);
+        opticalCue(entrance - .12, .38, animation);
         if (atmosphere) {
-          timeline.fromTo(atmosphere,
+          animation.fromTo(atmosphere,
             { autoAlpha: 0 },
             { autoAlpha: .96, duration: entrance * .72, ease: 'sine.inOut', immediateRender: false },
-            start,
+            0,
           ).to(atmosphere, { autoAlpha: 0, duration: exit, ease: 'power2.in' }, exitStart);
         }
-        timeline.fromTo(scene,
+        animation.fromTo(scene,
           { autoAlpha: 0, filter: 'blur(12px)' },
           { autoAlpha: 1, filter: 'blur(0px)', duration: entrance, ease: 'sine.inOut', immediateRender: false },
-          start,
+          0,
         ).fromTo(scene,
           {
             scale: 4.2, x: originX, y: originY, rotation: -4 * direction,
@@ -241,54 +289,118 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
             scale: 1, x: 0, y: 0, rotation: 0, rotationY: 0,
             duration: entrance, ease: 'power2.inOut', immediateRender: false,
           },
-          start,
-        ).to(scene, { scale: 1.025, duration: exitStart - settled, ease: 'sine.inOut' }, settled)
+          0,
+        ).to(scene, { scale: 1.025, duration: hold, ease: 'sine.inOut' }, entrance)
         .to(scene, {
           autoAlpha: 0, scale: .35, x: -80 * direction, y: 24,
           rotationY: 28 * direction, filter: 'blur(12px)', duration: exit, ease: 'power3.in',
         }, exitStart);
         if (echo) {
-          timeline.fromTo(echo,
+          animation.fromTo(echo,
             { autoAlpha: .7, scale: 1, filter: 'blur(0px)' },
             { autoAlpha: 0, scale: 1.65, filter: 'blur(8px)', duration: entrance * .65, ease: 'power2.out', immediateRender: false },
-            settled - entrance * .18,
+            entrance * .82,
           );
         }
         if (shockwave) {
-          timeline.fromTo(shockwave,
+          animation.fromTo(shockwave,
             { autoAlpha: .85, scale: .3 },
             { autoAlpha: 0, scale: 2.1, duration: entrance * .75, ease: 'power2.out', immediateRender: false },
-            settled - entrance * .15,
+            entrance * .85,
           );
         }
         if (descriptor) {
-          timeline.fromTo(descriptor,
+          animation.fromTo(descriptor,
             { autoAlpha: 0, y: 12, letterSpacing: '.9em' },
             { autoAlpha: 1, y: 0, letterSpacing: '.42em', duration: entrance * .55, ease: 'power3.out', immediateRender: false },
-            settled - entrance * .35,
+            entrance * .65,
           );
         }
         if (connector) {
-          timeline.fromTo(connector,
+          animation.fromTo(connector,
             { scaleX: 0, autoAlpha: 0, transformOrigin: '100% 50%' },
             { scaleX: 1, autoAlpha: 1, duration: entrance * .55, ease: 'power2.out', immediateRender: false },
-            settled - entrance * .45,
+            entrance * .55,
           ).to(connector, {
             scaleX: 0, autoAlpha: 0, duration: exit * .6, ease: 'power2.in',
           }, exitStart);
         }
         if (flare) {
-          timeline.fromTo(flare,
+          animation.fromTo(flare,
             { xPercent: -170, autoAlpha: 0 },
             { xPercent: 170, autoAlpha: 1, duration: entrance * .65, ease: 'power2.inOut', immediateRender: false },
-            settled - entrance * .65,
-          ).to(flare, { autoAlpha: 0, duration: entrance * .2 }, settled);
+            entrance * .35,
+          ).to(flare, { autoAlpha: 0, duration: entrance * .2 }, entrance);
         }
+        return animation;
       }
 
       if (editedOpening) {
-        sponsorMoment('sabian', .035, .115, .173, .215);
-        sponsorMoment('yamaha', .278, .326, .338, .356);
+        const sponsorMoments = [
+          {
+            id: 'sabian', at: .035, exitAt: .173, holdAt: 2.75,
+            animation: sponsorMoment('sabian', 1.9, .85, .7), triggered: false, queued: false, exitRequested: false,
+          },
+          {
+            id: 'yamaha', at: .278, exitAt: .338, holdAt: 2.5,
+            animation: sponsorMoment('yamaha', 1.7, .8, .65), triggered: false, queued: false, exitRequested: false,
+          },
+        ];
+        type SponsorMoment = (typeof sponsorMoments)[number];
+        let sponsorProgress = 0;
+        let activeSponsor: SponsorMoment | undefined;
+
+        for (const moment of sponsorMoments) {
+          moment.animation?.addPause(moment.holdAt, () => {
+            if (moment.exitRequested) moment.animation?.play();
+          });
+        }
+
+        function startSponsor(moment: SponsorMoment) {
+          if (!moment.animation || activeSponsor === moment) return;
+          if (activeSponsor) {
+            moment.queued = true;
+            return;
+          }
+          activeSponsor = moment;
+          moment.triggered = true;
+          moment.queued = false;
+          moment.animation.eventCallback('onComplete', () => {
+            activeSponsor = undefined;
+            const next = sponsorMoments.find(candidate => candidate.queued && sponsorProgress >= candidate.at);
+            if (next) startSponsor(next);
+          }).play(0);
+        }
+
+        function syncSponsors(progress: number) {
+          sponsorProgress = progress;
+          for (const moment of sponsorMoments) {
+            if (progress < moment.at) {
+              moment.queued = false;
+              if (moment !== activeSponsor) {
+                moment.triggered = false;
+                moment.exitRequested = false;
+                moment.animation?.pause(0);
+              }
+              continue;
+            }
+            if (progress >= moment.exitAt) moment.exitRequested = true;
+            if (!moment.triggered || moment.queued) {
+              startSponsor(moment);
+            } else if (moment.exitRequested && moment.animation?.paused()) {
+              moment.animation.play();
+            }
+          }
+        }
+
+        const sponsorTrigger = ScrollTrigger.create({
+          trigger: root,
+          start: 'top top',
+          end: 'bottom bottom',
+          onUpdate: self => syncSponsors(self.progress),
+          onRefresh: self => syncSponsors(self.progress),
+        });
+        syncSponsors(sponsorTrigger.progress);
         // The pullback and first performance angle are frames of the same edit.
         timeline
           .set(session, { autoAlpha: 1, '--session-live-opacity': 1, '--session-shade': 0 }, 0)
@@ -371,17 +483,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
           }, start - closingLead);
         }
 
-        gsap.set(titleChars, { yPercent: 128, rotationX: -72, opacity: 0, transformOrigin: '0% 100%' });
-        timeline.to(titleChars, {
-          yPercent: 0, rotationX: 0, opacity: 1,
-          duration: .075, stagger: .0032, ease: 'power4.out',
-        }, captionStart + .012);
-        revealCaption(lines, captionStart);
-
-        if (!closing) {
-          const hiddenAt = exitCaption(lines, nextStart);
-          timeline.set(chapter, { autoAlpha: 0 }, hiddenAt);
-        }
+        captionMoment(lines, titleChars, captionStart, closing ? undefined : nextStart);
       }
 
       // Open the performance back to its full frame before the closing photo.
@@ -393,9 +495,17 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         }, performanceStart - .026)
         .set(film, { autoAlpha: 0 }, closingEnd)
         .set(session, { autoAlpha: 0 }, closingEnd);
-      revealCaption(filmLines, performanceStart - captionLead);
-      exitCaption(filmLines, discoveryStart);
+      captionMoment(filmLines, undefined, performanceStart - captionLead, discoveryStart);
       opticalCue(performanceStart - captionLead, .58);
+
+      const captionTrigger = ScrollTrigger.create({
+        trigger: root,
+        start: 'top top',
+        end: 'bottom bottom',
+        onUpdate: self => syncCaptions(self.progress),
+        onRefresh: self => syncCaptions(self.progress),
+      });
+      syncCaptions(captionTrigger.progress);
 
       function sync() {
         const progress = timeline.progress();
@@ -411,13 +521,6 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         const scene = inFilm ? 'film' : heroChapters[index]?.id ?? 'portrait';
 
         if (root.dataset.scene !== scene) root.dataset.scene = scene;
-
-        const statusChapter = !inFilm && nextChapter ? heroChapters[visibleIndex] : undefined;
-        const nextCount = inFilm ? 'LIVE' : statusChapter ? `${String(visibleIndex + 1).padStart(2, '0')} / 07` : '00 / 07';
-        const nextName = inFilm ? 'Happy People 7/4' : statusChapter?.title ?? 'Opening titles';
-        if (sceneCount && sceneCount.textContent !== nextCount) sceneCount.textContent = nextCount;
-        if (sceneName && sceneName.textContent !== nextName) sceneName.textContent = nextName;
-        if (sceneMeter) sceneMeter.style.transform = `scaleX(${progress})`;
 
         if (activeChapter !== nextChapter) {
           if (activeChapter) {
@@ -488,9 +591,6 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         film.setAttribute('aria-hidden', 'true');
         delete root.dataset.scene;
         delete root.dataset.cinematic;
-        if (sceneCount) sceneCount.textContent = '00 / 07';
-        if (sceneName) sceneName.textContent = 'Opening titles';
-        if (sceneMeter) sceneMeter.style.transform = 'scaleX(0)';
       };
     });
 

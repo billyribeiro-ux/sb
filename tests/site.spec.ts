@@ -346,6 +346,61 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
   await expect(picture).toHaveJSProperty('paused', true);
 });
 
+test('sponsor entrances complete and exits wait for their own triggers', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/');
+  await skipArtistIntro(page);
+  const hero = page.locator('[data-hero-sequence]');
+  const sabian = hero.locator('[data-hero-sponsor-scene="sabian"]');
+  const yamaha = hero.locator('[data-hero-sponsor-scene="yamaha"]');
+
+  await seekHero(hero, .04);
+  await expect(sabian).toBeVisible();
+  await expect(yamaha).toBeHidden();
+  await page.waitForTimeout(3200);
+  await expect(sabian).toBeVisible();
+  await expect(yamaha).toBeHidden();
+
+  await seekHero(hero, .18);
+  await expect(sabian).toBeHidden({ timeout: 6000 });
+  await expect(yamaha).toBeHidden();
+
+  await seekHero(hero, .29);
+  await expect(yamaha).toBeVisible();
+  await page.waitForTimeout(3000);
+  await expect(yamaha).toBeVisible();
+
+  await seekHero(hero, .35);
+  await expect(yamaha).toBeHidden({ timeout: 6000 });
+});
+
+test('chapter captions remain visible until their individual exit triggers', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/');
+  await skipArtistIntro(page);
+  const hero = page.locator('[data-hero-sequence]');
+  const groove = hero.getByRole('heading', { name: 'Groove', exact: true });
+  const musicality = hero.getByRole('heading', { name: 'Musicality', exact: true });
+
+  await seekHero(hero, .25);
+  await expect(groove).toBeVisible();
+  await page.waitForTimeout(1600);
+  await expect(groove).toBeVisible();
+
+  await seekHero(hero, .36);
+  await expect(groove).toBeHidden({ timeout: 6000 });
+
+  await seekHero(hero, .59);
+  await expect(musicality).toBeVisible();
+  await page.waitForTimeout(1600);
+  await expect(musicality).toBeVisible();
+
+  await seekHero(hero, .69);
+  await expect(musicality).toBeHidden({ timeout: 6000 });
+});
+
 test('keeps long hero captions within the narrow stage during a reveal', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 720 });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
