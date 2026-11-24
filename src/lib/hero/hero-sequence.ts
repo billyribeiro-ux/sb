@@ -167,6 +167,8 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
       }
 
       const captionMoments: CaptionMoment[] = [];
+      let captionsInitialized = false;
+      let lastCaptionProgress = 0;
 
       function captionMoment(
         lines: NodeListOf<HTMLElement>,
@@ -198,37 +200,61 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
             if (moment.exitRequested) animation.play();
           }).to(lines, {
             y: (index) => index === 0 ? -typeTravel * .45 : -typeTravel * .28,
-            filter: 'blur(5px)', autoAlpha: 0,
-            duration: .45, ease: 'power2.in',
+            filter: 'blur(3px)', autoAlpha: 0,
+            duration: .75, ease: 'sine.inOut',
           }, 1.25);
           if (titleChars?.length) {
             animation.to(titleChars, {
-              yPercent: -110, rotationX: 55, opacity: 0,
-              duration: .45, stagger: .015, ease: 'power2.in',
+              yPercent: -55, rotationX: 15, opacity: 0,
+              duration: .75, stagger: .006, ease: 'sine.inOut',
             }, 1.25);
           }
         }
-        animation.eventCallback('onComplete', () => { moment.completed = true; });
+        animation.eventCallback('onComplete', () => {
+          moment.completed = true;
+          syncCaptions(captionTrigger.progress);
+        });
         captionMoments.push(moment);
       }
 
       function syncCaptions(progress: number) {
+        const jumped = Math.abs(progress - lastCaptionProgress) > .12;
+        lastCaptionProgress = progress;
+        const latestIndex = captionMoments.findLastIndex(moment => progress >= moment.start);
+        if (!captionsInitialized || jumped) {
+          for (const [index, moment] of captionMoments.entries()) {
+            if (index >= latestIndex || moment.started) continue;
+            moment.started = true;
+            moment.completed = true;
+            moment.exitRequested = true;
+            moment.animation.progress(1, true).pause();
+          }
+          captionsInitialized = true;
+        }
         for (const moment of captionMoments) {
           if (progress < moment.start) {
             moment.started = false;
             moment.completed = false;
             moment.exitRequested = false;
             moment.animation.pause(0);
-            continue;
+          } else if (moment.exitAt !== undefined && progress >= moment.exitAt) {
+            moment.exitRequested = true;
           }
-          if (moment.exitAt !== undefined && progress >= moment.exitAt) moment.exitRequested = true;
-          if (!moment.started) {
-            moment.started = true;
-            moment.animation.play(0);
-          } else if (!moment.completed && moment.exitRequested && moment.animation.paused()) {
+        }
+        const activeIndex = captionMoments.findIndex(moment => moment.started && !moment.completed);
+        for (const moment of captionMoments) {
+          if (moment.started && !moment.completed && moment.exitRequested && moment.animation.paused()) {
             moment.animation.play();
           }
         }
+        if (activeIndex >= 0) return;
+        const targetIndex = jumped
+          ? latestIndex
+          : captionMoments.findIndex(moment => !moment.completed && progress >= moment.start);
+        const target = captionMoments[targetIndex];
+        if (!target || target.started) return;
+        target.started = true;
+        target.animation.play(0);
       }
 
       function opticalCue(start: number, strength = .28, queue: gsap.core.Timeline = timeline) {
@@ -274,7 +300,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
             { autoAlpha: 0 },
             { autoAlpha: .96, duration: entrance * .72, ease: 'sine.inOut', immediateRender: false },
             0,
-          ).to(atmosphere, { autoAlpha: 0, duration: exit, ease: 'power2.in' }, exitStart);
+          ).to(atmosphere, { autoAlpha: 0, duration: exit, ease: 'sine.inOut' }, exitStart);
         }
         animation.fromTo(scene,
           { autoAlpha: 0, filter: 'blur(12px)' },
@@ -292,8 +318,8 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
           0,
         ).to(scene, { scale: 1.025, duration: hold, ease: 'sine.inOut' }, entrance)
         .to(scene, {
-          autoAlpha: 0, scale: .35, x: -80 * direction, y: 24,
-          rotationY: 28 * direction, filter: 'blur(12px)', duration: exit, ease: 'power3.in',
+          autoAlpha: 0, scale: .65, x: -40 * direction, y: 12,
+          rotationY: 10 * direction, filter: 'blur(5px)', duration: exit, ease: 'sine.inOut',
         }, exitStart);
         if (echo) {
           animation.fromTo(echo,
@@ -322,7 +348,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
             { scaleX: 1, autoAlpha: 1, duration: entrance * .55, ease: 'power2.out', immediateRender: false },
             entrance * .55,
           ).to(connector, {
-            scaleX: 0, autoAlpha: 0, duration: exit * .6, ease: 'power2.in',
+            scaleX: 0, autoAlpha: 0, duration: exit * .8, ease: 'sine.inOut',
           }, exitStart);
         }
         if (flare) {
@@ -339,11 +365,11 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         const sponsorMoments = [
           {
             id: 'sabian', at: .035, exitAt: .173, holdAt: 2.75,
-            animation: sponsorMoment('sabian', 1.9, .85, .7), triggered: false, queued: false, exitRequested: false,
+            animation: sponsorMoment('sabian', 1.9, .85, .95), triggered: false, queued: false, exitRequested: false,
           },
           {
             id: 'yamaha', at: .278, exitAt: .338, holdAt: 2.5,
-            animation: sponsorMoment('yamaha', 1.7, .8, .65), triggered: false, queued: false, exitRequested: false,
+            animation: sponsorMoment('yamaha', 1.7, .8, .9), triggered: false, queued: false, exitRequested: false,
           },
         ];
         type SponsorMoment = (typeof sponsorMoments)[number];

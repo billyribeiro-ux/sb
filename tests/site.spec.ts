@@ -383,6 +383,7 @@ test('chapter captions remain visible until their individual exit triggers', asy
   const hero = page.locator('[data-hero-sequence]');
   const groove = hero.getByRole('heading', { name: 'Groove', exact: true });
   const musicality = hero.getByRole('heading', { name: 'Musicality', exact: true });
+  const beforeHit = hero.getByRole('heading', { name: 'Before the hit', exact: true });
 
   await seekHero(hero, .25);
   await expect(groove).toBeVisible();
@@ -397,8 +398,15 @@ test('chapter captions remain visible until their individual exit triggers', asy
   await page.waitForTimeout(1600);
   await expect(musicality).toBeVisible();
 
-  await seekHero(hero, .69);
+  await seekHero(hero, .66);
+  await expect(beforeHit).toBeHidden();
+  await page.waitForTimeout(1600);
+  await expect(musicality).toBeVisible();
+  await expect(beforeHit).toBeHidden();
+
+  await seekHero(hero, .68);
   await expect(musicality).toBeHidden({ timeout: 6000 });
+  await expect(beforeHit).toBeVisible();
 });
 
 test('keeps long hero captions within the narrow stage during a reveal', async ({ page }) => {
