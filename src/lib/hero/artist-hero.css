@@ -6,7 +6,7 @@
   --hero-brass: #efb87d;
   --hero-dark: #0c0c0c;
   --hero-height: max(37rem, 100svh);
-  --hero-runway: 10.25;
+  --hero-runway: 19;
   --hero-caption-bottom: clamp(6.5rem, 15svh, 10.5rem);
   --hero-headroom: clamp(4.25rem, 11svh, 5.75rem);
   position: relative;
@@ -22,6 +22,51 @@
 .hero-stage { height: var(--hero-height); position: relative; isolation: isolate; overflow: clip; }
 .artist-hero[data-cinematic='true'] .hero-stage { position: sticky; top: 0; }
 .artist-hero[data-intro-phase] .hero-stage { height: max(var(--hero-height), 100dvh); }
+
+/* Everything the lens sees. A strike moves this group; the controls outside it stay put. */
+.hero-camera { position: absolute; inset: 0; z-index: 0; }
+
+/* A round lens vignette over the picture and under every word. */
+.hero-lens {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: radial-gradient(ellipse 82% 76% at 50% 46%, transparent 56%, #0504038c 100%);
+}
+
+/* Cinemascope: closed behind the loader, opened to a wide frame for the film, lifted for the last photograph. */
+.hero-mask { position: absolute; inset-inline: 0; z-index: 22; pointer-events: none; background: #050403; }
+.hero-mask-top { top: 0; block-size: 6.5svh; transform-origin: 50% 0%; }
+.hero-mask-bottom { bottom: 0; block-size: 9svh; transform-origin: 50% 100%; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .artist-hero[data-intro-phase='revealing'] .hero-mask-top {
+    animation: hero-mask-open-top var(--hero-arrival-duration) cubic-bezier(.16, 1, .3, 1) both;
+  }
+  .artist-hero[data-intro-phase='revealing'] .hero-mask-bottom {
+    animation: hero-mask-open-bottom var(--hero-arrival-duration) cubic-bezier(.16, 1, .3, 1) both;
+  }
+}
+
+@keyframes hero-mask-open-top { from { transform: scaleY(9); } to { transform: scaleY(1); } }
+@keyframes hero-mask-open-bottom { from { transform: scaleY(6.5); } to { transform: scaleY(1); } }
+
+/* A handheld camera: the picture drifts and breathes a little, never quite still. */
+@media (prefers-reduced-motion: no-preference) {
+  .artist-hero[data-cinematic='true'] .hero-camera :is(.hero-session, .hero-flow-cutaway) {
+    transform-origin: 50% 38%;
+    animation: hero-handheld 14s ease-in-out infinite;
+  }
+}
+
+@keyframes hero-handheld {
+  0% { transform: scale(1.022) translate(0, 0) rotate(0deg); }
+  23% { transform: scale(1.027) translate(-.2%, .14%) rotate(-.05deg); }
+  48% { transform: scale(1.03) translate(.17%, -.2%) rotate(.05deg); }
+  72% { transform: scale(1.024) translate(.22%, .17%) rotate(-.04deg); }
+  100% { transform: scale(1.022) translate(0, 0) rotate(0deg); }
+}
 
 .artist-hero :is(
   .hero-poster, .hero-chapter, .hero-finale, .hero-plate,
@@ -314,6 +359,36 @@
   content: '';
 }
 
+/* The mark carries a gold sheen clipped to the logo and a horizontal streak through its middle. */
+.hero-sponsor-mark { position: relative; z-index: 1; display: block; inline-size: fit-content; }
+
+.hero-sponsor-sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(104deg, transparent 42%, #f3cf9f 47%, #ffe9c6 50%, #f3cf9f 53%, transparent 58%) var(--sponsor-sheen, 130%) 0 / 260% 100% no-repeat;
+  -webkit-mask: var(--sponsor-mark) center / 100% 100% no-repeat;
+  mask: var(--sponsor-mark) center / 100% 100% no-repeat;
+}
+
+.hero-sponsor-sheen--sabian { --sponsor-mark: url('/images/sabian-logo.svg'); }
+.hero-sponsor-sheen--yamaha { --sponsor-mark: url('/images/yamaha-logo.svg'); }
+.hero-sponsor-sheen--remo { --sponsor-mark: url('/images/remo-logo.svg'); }
+.hero-sponsor-sheen--prologix { --sponsor-mark: url('/images/prologix-logo.png'); }
+
+.hero-sponsor-streak {
+  position: absolute;
+  z-index: -1;
+  inset-block-start: 50%;
+  inset-inline: -70%;
+  block-size: 1px;
+  translate: 0 -50%;
+  opacity: 0;
+  mix-blend-mode: screen;
+  background: linear-gradient(90deg, transparent, #efbd8266 22%, #fff4e2 50%, #efbd8266 78%, transparent);
+  box-shadow: 0 0 14px 2px #efbd8259, 0 0 54px 10px #efbd8226;
+}
+
 .hero-static-sponsors {
   display: flex;
   flex-wrap: wrap;
@@ -474,14 +549,26 @@
   object-position: center;
 }
 
-.hero-session :is(video, .hero-session-still) {
+.hero-session :is(.hero-session-frame, .hero-session-still) {
   position: absolute;
   inset: 0;
   transform: translate(var(--session-pan, 0%), var(--session-rise, 0%)) scale(var(--session-scale, 1));
   transform-origin: 50% 8%;
 }
 
-.hero-session video { opacity: var(--session-live-opacity, 0); }
+/* The video and its graded copy travel together; the grade fades in over the plain video. */
+.hero-session-frame { opacity: var(--session-live-opacity, 0); }
+
+.hero-session-frame canvas {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  opacity: 0;
+  transition: opacity .6s ease;
+}
+
+.hero-session-frame canvas[data-graded] { opacity: 1; }
 
 .artist-hero[data-opening-edit='true'] .hero-poster { background: transparent; }
 
@@ -493,24 +580,38 @@
   background: none;
 }
 
-[data-opening-edit='true'] .hero-session :is(video, .hero-session-still) {
+[data-opening-edit='true'] .hero-session :is(.hero-session-frame, video, .hero-session-still) {
   top: var(--hero-headroom);
   height: calc(100% - var(--hero-headroom));
 }
-.artist-hero[data-opening-edit='true'] .hero-plate img { filter: none; }
+.artist-hero[data-opening-edit='true'] .hero-plate img { filter: contrast(1.08) saturate(1.12); }
 .artist-hero[data-opening-edit='true'] :is(.hero-poster-shade, .hero-poster-vignette) {
   opacity: var(--hero-opening-grade);
 }
-.artist-hero[data-opening-edit='true'] .hero-rim { opacity: 0; }
+.artist-hero[data-opening-edit='true'] .hero-rim { transition: opacity .9s cubic-bezier(.22, 1, .36, 1); }
+/* The cymbal light belongs to the still and steps aside as soon as the opening is scrubbed. */
+[data-opening-edit='true'] .hero-stage[data-opening-scrub] .hero-rim { opacity: 0; transition-duration: .25s; }
 
 .artist-hero[data-opening-edit='true'] :is(.hero-plate img, .hero-session video, .hero-session-still) {
   object-fit: cover;
   object-position: 50% 0%;
 }
 
-[data-opening-edit='true'] .hero-stage[data-opening-ready][data-opening-scrub] .hero-portrait-picture {
+[data-opening-edit='true'] .hero-stage[data-opening-ready][data-opening-scrub] :is(.hero-portrait-picture, .hero-portrait-grade) {
   visibility: hidden;
 }
+
+/* The graded copy of the title still, laid over the photograph exactly. */
+.hero-portrait-grade {
+  position: absolute;
+  inset: var(--hero-headroom) 0 auto;
+  inline-size: 100%;
+  block-size: calc(100% - var(--hero-headroom));
+  opacity: 0;
+  transition: opacity .6s ease;
+}
+
+.hero-portrait-grade[data-graded] { opacity: 1; }
 
 :is(.hero-session, .hero-flow-cutaway)::after {
   content: '';
@@ -564,6 +665,18 @@
   background:
     linear-gradient(90deg, #090909e8 0%, #0a0a0a94 26%, #0a0a0a1c 54%, transparent 72%),
     linear-gradient(0deg, #090909ec 0%, #0909095c 24%, transparent 46%, transparent 88%, #0909096e);
+}
+
+/* A brass curtain crosses the closing photograph before the film shows it. */
+.hero-chapter-curtain {
+  position: absolute;
+  z-index: 1;
+  inset: var(--header) 0 3.7rem;
+  background: linear-gradient(100deg, #b9803f 0%, #e9b67a 38%, #fbe3bd 52%, #e9b67a 66%, #b9803f 100%);
+  box-shadow: 0 0 3rem #efbd8240;
+  transform: scaleX(0);
+  pointer-events: none;
+  will-change: transform;
 }
 
 .hero-chapter-copy {
@@ -631,54 +744,101 @@
 }
 
 /* --- Subtle 35mm optical cinema layers (no harsh stripes or hard wipes) --- */
+/* The grain tile is drawn at runtime (hero-grain.ts); these gradients only stand in without scripts. */
 .hero-grain {
+  inset: -72px;
   z-index: 26;
   pointer-events: none;
   opacity: .035;
   mix-blend-mode: overlay;
+  will-change: transform;
   background-image:
     repeating-radial-gradient(circle at 18% 32%, #fff 0 1px, transparent 1px 4px),
     repeating-radial-gradient(circle at 76% 68%, #ddd 0 1px, transparent 1px 5px);
   background-size: 140px 140px, 190px 190px;
-  animation: film-grain-shift 420ms steps(6) infinite;
+  animation: film-grain-shift 1s steps(1, end) infinite;
 }
 
+/* Twelve fresh positions a second: grain should be felt, not watched. */
 @keyframes film-grain-shift {
   0% { transform: translate(0, 0); }
-  20% { transform: translate(-2%, 1.5%); }
-  40% { transform: translate(1.5%, -2%); }
-  60% { transform: translate(-1.5%, -1%); }
-  80% { transform: translate(2%, 1%); }
+  8.333% { transform: translate(-37px, 21px); }
+  16.667% { transform: translate(19px, -43px); }
+  25% { transform: translate(-29px, -13px); }
+  33.333% { transform: translate(41px, 31px); }
+  41.667% { transform: translate(-11px, 47px); }
+  50% { transform: translate(33px, -29px); }
+  58.333% { transform: translate(-47px, -7px); }
+  66.667% { transform: translate(7px, 13px); }
+  75% { transform: translate(-23px, 39px); }
+  83.333% { transform: translate(29px, -17px); }
+  91.667% { transform: translate(-41px, -37px); }
   100% { transform: translate(0, 0); }
 }
 
-.hero-strike-trace {
-  position: absolute;
-  z-index: 5;
-  left: 66%;
-  top: 79%;
-  pointer-events: none;
+/* A strike lands where the cymbal is: a flash, an anamorphic streak and rings leaving the metal. */
+.hero-impact { position: absolute; inset: 0; z-index: 27; pointer-events: none; }
+
+.hero-impact-flash, .hero-impact-shade { position: absolute; inset: 0; }
+
+.hero-impact-flash {
+  mix-blend-mode: screen;
+  background: radial-gradient(ellipse 46% 40% at var(--hero-strike-x, 54%) var(--hero-strike-y, 46%), #fff6e4 0%, #f1c28d59 34%, transparent 70%);
+  animation: hero-impact-flash .6s ease-out both;
 }
-.hero-strike-trace span {
+
+.hero-impact-shade {
+  background: radial-gradient(ellipse 62% 58% at var(--hero-strike-x, 54%) var(--hero-strike-y, 46%), transparent 48%, #05040359 100%);
+  animation: hero-impact-shade .45s ease-out both;
+}
+
+.hero-impact-beam, .hero-impact-ring {
   position: absolute;
-  width: 16vmax;
-  height: 7vmax;
-  border: 1px solid #ffffffa3;
-  border-radius: 50%;
-  rotate: -15deg;
-  box-shadow: 0 0 1.4rem #ffffff70;
+  left: var(--hero-strike-x, 54%);
+  top: var(--hero-strike-y, 46%);
   translate: -50% -50%;
-  animation: artist-strike 1s ease-out both;
 }
-.hero-strike-trace span + span { animation-delay: .12s; }
-@keyframes artist-strike {
-  from { transform: scale(.23); opacity: .65; }
-  to { transform: scale(3.3); opacity: 0; }
+
+.hero-impact-beam {
+  inline-size: 170vmax;
+  block-size: 2px;
+  rotate: -4deg;
+  scale: 0 1;
+  mix-blend-mode: screen;
+  background: linear-gradient(90deg, transparent 6%, #efbd8259 24%, #fff4e2 50%, #efbd8259 76%, transparent 94%);
+  box-shadow: 0 0 16px 3px #ffdcae80, 0 0 64px 14px #efbd8233;
+  animation: hero-impact-beam 1.05s cubic-bezier(.16, 1, .3, 1) both;
+}
+
+.hero-impact-ring {
+  inline-size: 19vmax;
+  block-size: 7.6vmax;
+  border: 1px solid #fff6e6;
+  border-radius: 50%;
+  rotate: -14deg;
+  scale: .12;
+  filter: blur(.6px);
+  box-shadow: 0 0 1.4rem #ffffff59, inset 0 0 1rem #ffffff38;
+  animation: hero-impact-ring 1.25s cubic-bezier(.16, 1, .3, 1) both;
+}
+
+.hero-impact-ring:nth-of-type(4) { animation-delay: .1s; --ring-gain: .6; }
+.hero-impact-ring:nth-of-type(5) { animation-delay: .22s; --ring-gain: .38; }
+
+@keyframes hero-impact-flash { 0% { opacity: 0; } 12% { opacity: var(--impact-gain, 1); } 100% { opacity: 0; } }
+@keyframes hero-impact-shade { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes hero-impact-beam { 0% { scale: 0 1; opacity: 0; } 18% { opacity: var(--impact-gain, 1); } 34% { scale: 1 1; } 100% { scale: 1 1; opacity: 0; } }
+@keyframes hero-impact-ring { 0% { scale: .12; opacity: calc(.7 * var(--ring-gain, 1)); } 100% { scale: 4.4; opacity: 0; } }
+
+/* On a narrow screen the cymbal sits behind the credits, so the flash and streak stay gentle there. */
+@media (max-width: 850px), (max-aspect-ratio: 5/4) {
+  .hero-impact-flash, .hero-impact-beam { --impact-gain: .5; }
+  .hero-impact-beam { box-shadow: 0 0 10px 2px #ffdcae4d, 0 0 40px 8px #efbd821f; }
 }
 
 @media (max-width: 850px), (max-aspect-ratio: 5/4) {
   .artist-hero {
-    --hero-runway: 10;
+    --hero-runway: 16;
     --hero-caption-bottom: clamp(6.1rem, 14svh, 8.4rem);
   }
   .hero-poster-shade {
@@ -698,12 +858,11 @@
   }
   .hero-name-first { font-size: .44em; }
   .hero-meta { bottom: clamp(5.5rem, 10svh, 6.2rem); }
-  .hero-strike-trace { left: 48%; top: 68%; }
   .hero-stage :is(.hero-session video, .hero-session-still, .hero-flow-cutaway video) { object-position: 50% 21%; }
   .artist-hero[data-opening-edit='true'] :is(.hero-plate img, .hero-session video, .hero-session-still) {
     object-position: 46% 20%;
   }
-  .hero-session :is(video, .hero-session-still) {
+  .hero-session :is(.hero-session-frame, .hero-session-still) {
     transform:
       translate(calc(var(--session-pan, 0%) * .35), calc(var(--session-rise, 0%) * .35))
       scale(calc(1 + (var(--session-scale, 1) - 1) * .34));
@@ -713,6 +872,7 @@
     background: linear-gradient(0deg, #080808 18%, transparent 67%);
   }
   .hero-chapter-plate { inset: var(--header) 0 18%; }
+  .hero-chapter-curtain { inset: var(--header) 0 18%; }
   .hero-chapter-grade { background: linear-gradient(0deg, #141414 16%, transparent 62%); }
   .artist-hero .hero-chapter-copy h2 { font-size: clamp(2.5rem, 10vw, 5.65rem); }
   .hero-chapter-copy p { font-size: clamp(.92rem, 3.35vw, 1.13rem); line-height: 1.45; }
@@ -771,8 +931,38 @@
 .hero-optical-flash, .hero-light-leak { position: absolute; inset: 0; z-index: 25; opacity: 0; pointer-events: none; mix-blend-mode: screen; }
 .hero-optical-flash { background: radial-gradient(ellipse at 50% 48%, #fff7e8, #f1c28d45 34%, transparent 70%); }
 .hero-light-leak { inset: -45% auto -45% -65%; width: 58%; background: linear-gradient(105deg, transparent 12%, #cb3f2033 33%, #ffd9a085 50%, #99c7ff45 63%, transparent 86%); filter: blur(22px); transform: rotate(12deg); }
-.hero-stage :is(.hero-session video, .hero-session-still) { filter: brightness(var(--session-brightness, 1)) saturate(var(--session-saturation, 1)) contrast(1.045); }
-.hero-flow-cutaway video { filter: brightness(1.02) saturate(.9) contrast(1.08); }
+.hero-stage :is(.hero-session video, .hero-session-still) { filter: brightness(var(--session-brightness, 1)) saturate(calc(var(--session-saturation, 1) * 1.12)) contrast(1.1); }
+.hero-flow-cutaway video { filter: brightness(1.03) saturate(1.06) contrast(1.14); }
+
+/* A streak of light crosses the lens on every cut. */
+.hero-optical-streak {
+  position: absolute;
+  inset-inline-start: 50%;
+  inset-block-start: 50%;
+  z-index: 25;
+  inline-size: 130vmax;
+  block-size: 3px;
+  translate: -50% -50%;
+  opacity: 0;
+  visibility: hidden;
+  mix-blend-mode: screen;
+  filter: blur(.7px);
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent 2%, #efbd821a 20%, #ffe3bd80 41%, #fffdf5 50%, #ffe3bd80 59%, #efbd821a 80%, transparent 98%);
+  box-shadow: 0 0 26px 6px #ffdcae4d, 0 0 100px 26px #efbd821a;
+}
+
+.hero-optical-streak::before {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  inline-size: 46vmax;
+  block-size: 9vmax;
+  translate: -50% -50%;
+  filter: blur(6px);
+  background: radial-gradient(ellipse at center, #fff7e6b3 0%, #ffd9a659 28%, transparent 70%);
+  content: '';
+}
 
 .hero-scroll-instruction { position: absolute; z-index: 31; left: 50%; bottom: 5.5rem; display: flex; align-items: center; gap: .85rem; color: #f0d8bc; font: 540 .63rem/1.3 var(--body); letter-spacing: .2em; text-transform: uppercase; opacity: 0; transform: translateX(-50%); pointer-events: none; white-space: nowrap; }
 .hero-scroll-instruction i { display: block; width: 3.5rem; height: 1px; overflow: hidden; background: #efbd8240; }
@@ -783,13 +973,70 @@
 /* Kinetic chapter compositions */
 .hero-chapter-copy { max-inline-size: min(62rem, 82vw); perspective: 1100px; pointer-events: none; }
 .hero-chapter-copy a { pointer-events: auto; }
-.hero-chapter-kicker { margin: 0 0 1rem !important; color: var(--hero-brass) !important; font: 620 clamp(.64rem, .85vw, .78rem)/1.4 var(--body) !important; letter-spacing: .23em; text-transform: uppercase; }
+.hero-chapter-kicker { max-width: none !important; margin: 0 0 1rem !important; color: var(--hero-brass) !important; font: 620 clamp(.64rem, .85vw, .78rem)/1.4 var(--body) !important; letter-spacing: .23em; text-transform: uppercase; }
 .artist-hero .hero-chapter-copy h2 { max-inline-size: 12ch; font-size: clamp(4.4rem, 10.8vw, 11.5rem); line-height: .82; letter-spacing: -.028em; text-wrap: balance; }
 .hero-title-word { display: inline-block; margin: -.1em .19em -.1em 0; padding: .1em .015em; overflow: clip; vertical-align: top; }
 .hero-title-char { display: inline-block; transform-origin: 0 100%; will-change: transform, opacity; }
+
+/* A sheen runs through each letter as it lands: an overlay clipped to the glyph, so the type keeps its own colour and shadow. */
+.hero-char, .hero-title-char { position: relative; }
+
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+  .hero-char::after, .hero-title-char::after {
+    position: absolute;
+    inset: 0;
+    /* Transparent type still paints an inherited text-shadow over the real letter, so the overlay carries none. */
+    color: transparent;
+    text-shadow: none;
+    background: linear-gradient(104deg, transparent 40%, #fff6e6 48%, #ffe1b6 52%, transparent 60%) var(--type-sheen, 0%) 0 / 260% 100% no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    content: attr(data-char);
+    pointer-events: none;
+  }
+}
 .hero-chapter-description { max-width: 35rem !important; margin-top: 1.2rem !important; color: #fff0dc !important; font-size: clamp(1rem, 1.45vw, 1.3rem) !important; line-height: 1.5 !important; text-shadow: 0 2px 18px #000; }
 .hero-chapter-copy a { margin-top: 1.15rem; border-bottom: 1px solid #efbd8266; text-decoration: none; }
 .hero-chapter-copy a:hover { color: #ffe3bd; border-color: currentColor; }
+
+/* The phrase a line leans on is marked in brass as the line lands.
+   The words stay cream; a dark copy is uncovered only where the brass has already arrived beneath it. */
+.hero-chapter-em {
+  position: relative;
+  z-index: 0;
+  font-style: normal;
+  text-shadow: none;
+  white-space: nowrap;
+}
+
+.hero-chapter-em::before {
+  position: absolute;
+  z-index: -1;
+  inset: .1em -.2em .02em -.14em;
+  background: var(--hero-brass);
+  content: '';
+  transform: scaleX(var(--mark, 0));
+  transform-origin: 0% 50%;
+}
+
+.hero-chapter-em::after {
+  position: absolute;
+  inset: 0;
+  color: #20140d;
+  content: attr(data-text);
+  clip-path: inset(-0.2em calc((1 - var(--mark, 0)) * 100%) -0.2em -0.2em);
+}
+
+.hero-chapter-rule {
+  display: inline-block;
+  inline-size: 2.6rem;
+  block-size: 1px;
+  margin-inline-end: .85rem;
+  vertical-align: .3em;
+  background: var(--hero-brass);
+  box-shadow: 0 0 8px #efbd8280;
+  transform-origin: 0% 50%;
+}
 
 @media (min-width: 851px) and (min-aspect-ratio: 5/4) {
   [data-hero-chapter='control'] .hero-chapter-copy { margin-left: auto; text-align: right; }
@@ -838,7 +1085,22 @@
   .hero-actions { grid-template-columns: .7fr .7fr 1.6fr; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hero-arrival-burst, .hero-optical-flash, .hero-light-leak, .hero-scroll-instruction { display: none; }
+  .hero-arrival-burst, .hero-optical-flash, .hero-light-leak, .hero-scroll-instruction, .hero-impact, .hero-mask { display: none; }
+}
+
+/* The grade carries its own grain, so the overlay only has to cover what it does not reach. */
+.hero-grain[data-grain] { opacity: .05; }
+.artist-hero:has(canvas[data-graded]) .hero-grain { opacity: .02; }
+
+/* The moving picture behind the title still. It is only ever sampled into the grade. */
+.artist-hero .hero-session video.hero-live-picture {
+  position: absolute;
+  inset-inline-start: -3px;
+  inset-block-end: -3px;
+  inline-size: 2px;
+  block-size: 2px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

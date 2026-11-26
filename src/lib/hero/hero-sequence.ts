@@ -45,13 +45,16 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
   const flash = element('flash');
   const lightLeak = element('leak');
   const scrollInstruction = element('scroll');
+  const maskTop = element('mask-top');
+  const maskBottom = element('mask-bottom');
+  const streak = element('streak');
   const chapters = [...root.querySelectorAll<HTMLElement>('[data-hero-chapter]')];
   if (!portrait || !backdrop || !session || !type || !details || !light ||
       !film || !caption || chapters.length !== heroChapters.length) return;
 
   const layers = {
     portrait, backdrop, session, type, details, light, film, caption,
-    flash, lightLeak, scrollInstruction,
+    flash, lightLeak, scrollInstruction, maskTop, maskBottom, streak,
   };
   const preference = window.matchMedia(motionQuery);
   let disposed = false;
@@ -66,7 +69,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
 
     const {
       portrait, backdrop, session, type, details, light, film, caption,
-      flash, lightLeak, scrollInstruction,
+      flash, lightLeak, scrollInstruction, maskTop, maskBottom, streak,
     } = layers;
     const discovery = chapters[chapters.length - 1];
     const discoveryStart = heroChapters[heroChapters.length - 1].start;
@@ -80,6 +83,32 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
     const filmLines = caption.querySelectorAll<HTMLElement>('[data-hero-film-line]');
 
     gsap.registerPlugin(ScrollTrigger);
+    const noise = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#/*<>+';
+    const labels = [...root.querySelectorAll<HTMLElement>('[data-scramble]')];
+    let scrawls: gsap.core.Tween[] = [];
+
+    // Letters resolve out of static, left to right, the way a line comes through a monitor.
+    function scramble(element: HTMLElement) {
+      const text = element.dataset.text ?? (element.dataset.text = element.textContent ?? '');
+      const state = { progress: 0 };
+      return gsap.to(state, {
+        progress: 1, duration: .7, ease: 'none',
+        onUpdate: () => {
+          const shown = Math.round(state.progress * text.length);
+          const step = Math.floor(state.progress * 110);
+          element.textContent = text.slice(0, shown) + [...text.slice(shown)]
+            .map((char, index) => char === ' ' ? ' ' : noise[(step + index * 7) % noise.length]).join('');
+        },
+        onComplete: () => { element.textContent = text; },
+      });
+    }
+
+    // The dock's labels come through the monitor when the film starts and again when it lets go of the frame.
+    function scrawl() {
+      scrawls.forEach((tween) => tween.kill());
+      scrawls = labels.map(scramble);
+    }
+
     const queries = gsap.matchMedia(root);
     revert = () => queries.revert();
 
@@ -91,6 +120,8 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
       let matchingOpening = false;
       let cutawayActive = false;
       let activeChapter: HTMLElement | undefined;
+      let slated = false;
+      let credited = false;
 
       // Theatrical title-sequence entrance (headroom-safe scale from upper-center origin)
       let introTimeline: gsap.core.Timeline | undefined;
@@ -147,6 +178,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
       if (cutaway) gsap.set(cutaway, { autoAlpha: 0 });
       if (flash) gsap.set(flash, { autoAlpha: 0 });
       if (lightLeak) gsap.set(lightLeak, { autoAlpha: 0, xPercent: -125 });
+      if (streak) gsap.set(streak, { autoAlpha: 0, scaleX: 0 });
 
       const timeline = gsap.timeline({ paused: true, defaults: { ease: 'none' } });
       const sessionReveal = openingStart * .38;
@@ -190,11 +222,24 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
           y: 0, autoAlpha: 1, filter: 'blur(0px)',
           duration: .65, stagger: .07, ease: 'power3.out',
         }, 0);
+        const rule = lines[0]?.querySelector<HTMLElement>('.hero-chapter-rule');
+        if (rule) animation.fromTo(rule, { scaleX: 0 }, { scaleX: 1, duration: .7, ease: 'power3.out' }, .03);
+        const kicker = lines[0]?.querySelector<HTMLElement>('[data-chapter-kicker]');
+        if (kicker) animation.add(scramble(kicker), .02);
+        // Brass wipes in behind the phrase the line leans on, and its ink darkens wherever the brass has reached.
+        const marks = [...lines].flatMap((line) => [...line.querySelectorAll<HTMLElement>('.hero-chapter-em')]);
+        if (marks.length) animation.fromTo(marks, { '--mark': 0 }, {
+          '--mark': 1, duration: .55, stagger: .22, ease: 'none', immediateRender: false,
+        }, .72);
         if (titleChars?.length) {
           animation.to(titleChars, {
             yPercent: 0, rotationX: 0, opacity: 1,
             duration: .8, stagger: .022, ease: 'power4.out',
           }, .08);
+          // A sheen follows the letters up, left to right.
+          animation.fromTo(titleChars, { '--type-sheen': '0%' }, {
+            '--type-sheen': '100%', duration: .8, ease: 'sine.inOut', stagger: .022, immediateRender: false,
+          }, .14);
         }
         if (exitAt !== undefined) {
           animation.addPause(1.25, () => {
@@ -263,20 +308,30 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
           queue.to(flash, { autoAlpha: strength, duration: .014, ease: 'power2.in' }, start)
             .to(flash, { autoAlpha: 0, duration: .07, ease: 'power2.out' }, start + .014);
         }
-        if (lightLeak) {
-          queue.fromTo(lightLeak,
-            { autoAlpha: 0, xPercent: -125 },
-            { autoAlpha: .72, xPercent: 340, duration: .12, ease: 'power2.inOut', immediateRender: false },
-            start - .018,
-          ).to(lightLeak, { autoAlpha: 0, duration: .035 }, start + .102);
-        }
+      if (lightLeak) {
+        queue.fromTo(lightLeak,
+          { autoAlpha: 0, xPercent: -125 },
+          { autoAlpha: .72, xPercent: 340, duration: .12, ease: 'power2.inOut', immediateRender: false },
+          start - .018,
+        ).to(lightLeak, { autoAlpha: 0, duration: .035 }, start + .102);
       }
+      // The streak belongs to the cuts in the film itself, not to a sponsor's own clock.
+      if (streak && queue === timeline) {
+        queue.fromTo(streak,
+          { scaleX: 0, autoAlpha: 0 },
+          { scaleX: 1, autoAlpha: .7, duration: .022, ease: 'power2.out', immediateRender: false },
+          start - .014,
+        ).to(streak, { autoAlpha: 0, duration: .038, ease: 'sine.out' }, start + .008);
+      }
+    }
 
       function sponsorMoment(id: string, entrance: number, hold: number, exit: number) {
         const scene = root.querySelector<HTMLElement>(`[data-hero-sponsor-scene="${id}"]`);
         const atmosphere = root.querySelector<HTMLElement>('[data-hero-sponsor-atmosphere]');
         const frame = root.querySelector<HTMLElement>('[data-hero-stage]');
         const connector = scene?.querySelector<HTMLElement>('.hero-sponsor-connector');
+        const sheen = scene?.querySelector<HTMLElement>('.hero-sponsor-sheen');
+        const streak = scene?.querySelector<HTMLElement>('.hero-sponsor-streak');
         const descriptor = scene?.querySelector<HTMLElement>('.hero-sponsor-descriptor');
         const echo = scene?.querySelector<HTMLElement>('.hero-sponsor-echo');
         const shockwave = scene?.querySelector<HTMLElement>('.hero-sponsor-shockwave');
@@ -351,6 +406,21 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
           ).to(connector, {
             scaleX: 0, autoAlpha: 0, duration: exit * .8, ease: 'sine.inOut',
           }, exitStart);
+        }
+        if (sheen) {
+          // Gold runs through the mark once it has landed.
+          animation.fromTo(sheen,
+            { '--sponsor-sheen': '-30%' },
+            { '--sponsor-sheen': '130%', duration: entrance * .8, ease: 'sine.inOut' },
+            entrance * .55,
+          );
+        }
+        if (streak) {
+          animation.fromTo(streak,
+            { scaleX: 0, autoAlpha: 0 },
+            { scaleX: 1, autoAlpha: .9, duration: entrance * .5, ease: 'power2.out' },
+            entrance * .45,
+          ).to(streak, { autoAlpha: 0, duration: exit, ease: 'sine.inOut' }, exitStart);
         }
         if (flare) {
           animation.fromTo(flare,
@@ -486,13 +556,36 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         const { start, id, framing } = heroChapters[index];
         const lines = chapter.querySelectorAll<HTMLElement>('[data-chapter-line]');
         const plate = chapter.querySelector<HTMLElement>('[data-chapter-plate]');
+        const curtain = chapter.querySelector<HTMLElement>('[data-chapter-curtain]');
         const titleChars = chapter.querySelectorAll<HTMLElement>('[data-hero-title-char]');
         const nextStart = id === 'anticipation' ? performanceStart : heroChapters[index + 1]?.start ?? 1;
         const closing = chapter === discovery;
-        const captionStart = index === 0 ? grooveCaptionStart : start - captionLead;
+        // The closing photograph is uncovered by its curtain first; its title follows once the picture is showing.
+        const captionStart = index === 0 ? grooveCaptionStart : start - (closing ? captionLead * .2 : captionLead);
 
         chapter.style.zIndex = String(closing ? 24 : 10 + index);
-        if (closing) {
+        if (closing && curtain && plate) {
+          // A brass curtain crosses the frame, and the photograph is what it leaves behind.
+          const arrive = start - closingLead * 2.4;
+          timeline.fromTo(chapter,
+            { clipPath: 'inset(9% 6%)' },
+            { clipPath: 'inset(0% 0%)', duration: closingLead * 1.4, ease: 'power3.out', immediateRender: false },
+            arrive,
+          ).to(chapter, {
+            autoAlpha: 1, duration: closingLead * 1.2, ease: 'sine.inOut',
+          }, arrive)
+            .set(plate, { autoAlpha: 0 }, arrive)
+            .fromTo(curtain,
+              { scaleX: 0, transformOrigin: '0% 50%' },
+              { scaleX: 1, duration: closingLead * 1.4, ease: 'power2.inOut', immediateRender: false },
+              arrive,
+            )
+            .set(plate, { autoAlpha: 1 }, start - closingLead)
+            .to(curtain, {
+              scaleX: 0, transformOrigin: '100% 50%', duration: closingLead * .75, ease: 'power2.inOut',
+            }, start - closingLead);
+          opticalCue(start - closingLead, .5);
+        } else if (closing) {
           timeline.fromTo(chapter,
             { clipPath: 'inset(9% 6%)' },
             { clipPath: 'inset(0% 0%)', duration: closingLead + closingTail, ease: 'power3.out', immediateRender: false },
@@ -533,6 +626,11 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
       captionMoment(filmLines, undefined, performanceStart - captionLead, discoveryStart);
       opticalCue(performanceStart - captionLead, .58);
 
+      // The frame opens up for the closing photograph, so the film hands off to the page without an edge.
+      for (const [mask, direction] of [[maskTop, -1], [maskBottom, 1]] as const) {
+        if (mask) timeline.to(mask, { yPercent: direction * 101, duration: closingTail * .9, ease: 'power2.inOut' }, discoveryStart + .01);
+      }
+
       const captionTrigger = ScrollTrigger.create({
         trigger: root,
         start: 'top top',
@@ -544,6 +642,18 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
 
       function sync() {
         const progress = timeline.progress();
+        if (progress < .002) {
+          slated = false;
+          credited = false;
+        }
+        if (!slated && progress > .003) {
+          slated = true;
+          scrawl();
+        }
+        if (!credited && progress > discoveryStart + .02) {
+          credited = true;
+          scrawl();
+        }
         options.onOpeningProgress?.(progress / openingHandoff);
         if (progress > 0.015 && introTimeline?.isActive()) {
           introTimeline.progress(1);
@@ -603,13 +713,29 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         trigger: root,
         start: 'top top',
         end: 'bottom bottom',
-        scrub: 1.1,
+        scrub: 1.6,
         onRefresh: sync,
       });
       sync();
 
+      // Once the title has landed, one reflection crosses the cymbal while a sheen runs through the name.
+      if (editedOpening && options.arrivedThroughIntro && window.scrollY < 24) {
+        gsap.fromTo(openingSweep, { progress: 0 }, {
+          progress: 1, duration: 2.8, delay: .5, ease: 'sine.inOut',
+          onUpdate: () => { if (timeline.progress() < .02) options.sweepCymbal?.(openingSweep.progress); },
+          onComplete: () => options.sweepCymbal?.(0),
+        });
+        gsap.fromTo(chars, { '--type-sheen': '0%' }, {
+          '--type-sheen': '100%', duration: .7, ease: 'sine.inOut', stagger: .05, delay: .3,
+        });
+      }
+
       return () => {
         introTimeline?.kill();
+        scrawls.forEach((tween) => tween.kill());
+        for (const label of [...labels, ...root.querySelectorAll<HTMLElement>('[data-chapter-kicker]')]) {
+          if (label.dataset.text) label.textContent = label.dataset.text;
+        }
         options.onPictureChange?.(false);
         options.onCutawayChange?.(false);
         if (activeChapter) {
