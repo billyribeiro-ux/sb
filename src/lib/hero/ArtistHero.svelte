@@ -10,7 +10,7 @@
   import ArtistOpening from './ArtistOpening.svelte';
   import HeroCymbalLight from './HeroCymbalLight.svelte';
   import HeroDepthPortrait from './HeroDepthPortrait.svelte';
-  import { heroSequence } from './hero-sequence';
+  import { heroMotionQuery, heroSequence } from './hero-sequence';
   import { mountHeroPerformance } from './hero-performance';
   import { filmGrain } from './hero-grain';
   import { filmWheel } from './hero-scroll';
@@ -26,6 +26,9 @@
     comparisonHref?: string;
     filmHref?: string;
     openingEdit?: HeroOpeningEdit;
+    showFlowCutaway?: boolean;
+    revealOnLoad?: boolean;
+    lowerTitle?: boolean;
   }
 
   let {
@@ -33,6 +36,9 @@
     comparisonHref = '#hear-the-difference',
     filmHref = '#performance-film',
     openingEdit,
+    showFlowCutaway = true,
+    revealOnLoad = false,
+    lowerTitle = false,
   }: Props = $props();
   let rootEl: HTMLElement | undefined;
   let camera: HTMLElement | undefined;
@@ -42,6 +48,7 @@
   let transport = $state<ReturnType<typeof mountHeroPerformance>>();
   let soundPlaying = $state(false);
   let introPhase = $state<'waiting' | 'revealing'>();
+  let previewReveal = $state<'holding' | 'playing' | 'complete'>('holding');
   let beginIntro: (() => void) | undefined;
   let finishIntro: (() => void) | undefined;
   let strikes = $state(0);
@@ -75,12 +82,18 @@
     const video = node.querySelector<HTMLVideoElement>('[data-hero-session-picture]');
     const soundtrack = node.querySelector<HTMLAudioElement>('[data-hero-soundtrack]');
     const cutaway = node.querySelector<HTMLVideoElement>('[data-hero-flow-picture]');
-    if (!stage || !video || !soundtrack || !cutaway) return;
+    if (!stage || !video || !soundtrack) return;
 
     rootEl = node;
     let sequence: ReturnType<typeof heroSequence>;
     let introTimer = 0;
     let washTimer = 0;
+    let previewTimer = 0;
+    let pictureRequested = false;
+    const deepLink = location.hash && location.hash !== '#top';
+    let skipPreviewReveal = Boolean(deepLink) || window.scrollY >= 24;
+    const cinematicMotion = matchMedia(heroMotionQuery);
+    let pictureReleased = !revealOnLoad || skipPreviewReveal || !cinematicMotion.matches;
     const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
     const playback = mountHeroPerformance(stage, video, soundtrack, (playing) => {
       soundPlaying = playing;
@@ -96,7 +109,7 @@
     });
     // The title still hides the first seconds of the performance, so it comes alive wherever the visitor looks.
     // Before the camera pulls back the framing holds, and the cymbal lifts inside the frozen photograph.
-    const portrait = createFilmGrade(node.querySelector('.hero-portrait-grade'), still, look, {
+    const portrait = createFilmGrade(node.querySelector('.hero-portrait-grade'), still, look, revealOnLoad ? {} : {
       live: {
         source: openingEdit?.picture ?? heroSession.picture,
         until: 2.9,
@@ -111,12 +124,23 @@
       sequence = heroSequence(node, {
         sweepCymbal,
         openingEdit: Boolean(openingEdit),
+        playFromStart: revealOnLoad,
         arrivedThroughIntro,
         onOpeningProgress: (progress) => {
+          if (revealOnLoad) {
+            if (progress >= .12) {
+              skipPreviewReveal = true;
+              if (previewReveal === 'playing') previewReveal = 'complete';
+            }
+            return;
+          }
           if (openingEdit) playback.seekOpening(progress);
           else depthPortrait?.seek(progress);
         },
-        onPictureChange: playback.setPictureActive,
+        onPictureChange: (active, matchingOpening) => {
+          pictureRequested = active;
+          if (pictureReleased) playback.setPictureActive(active, matchingOpening);
+        },
         onCutawayChange: playback.setCutawayActive,
       });
     }
@@ -129,8 +153,33 @@
       finishIntro?.();
     }
 
-    const deepLink = location.hash && location.hash !== '#top';
-    if (!deepLink && window.scrollY < 24 && !motionPreference.matches) {
+    function holdPreviewImage() {
+      previewTimer = window.setTimeout(() => {
+        pictureReleased = true;
+        playback.setPictureActive(pictureRequested);
+      }, 1000);
+    }
+
+    function showPreviewPicture() {
+      previewReveal = skipPreviewReveal ? 'complete' : 'playing';
+    }
+
+    function settleInterruptedReveal() {
+      if (!cinematicMotion.matches && previewReveal === 'playing') previewReveal = 'complete';
+    }
+
+    if (revealOnLoad) {
+      playback.setSound(false);
+      video.addEventListener('playing', showPreviewPicture, { once: true });
+      cinematicMotion.addEventListener('change', settleInterruptedReveal);
+      if (!pictureReleased) {
+        if (still && !still.complete) {
+          still.addEventListener('load', holdPreviewImage, { once: true });
+          still.addEventListener('error', holdPreviewImage, { once: true });
+        } else holdPreviewImage();
+      }
+      startSequence();
+    } else if (!deepLink && window.scrollY < 24 && !motionPreference.matches) {
       introPhase = 'waiting';
       // The frame waits behind the title card as a brand-colour print and resolves as it opens.
       portrait.washTo(1, 0);
@@ -165,6 +214,12 @@
     return () => {
       window.clearTimeout(introTimer);
       window.clearTimeout(washTimer);
+      window.clearTimeout(previewTimer);
+      still?.removeEventListener('load', holdPreviewImage);
+      still?.removeEventListener('error', holdPreviewImage);
+      video.removeEventListener('playing', showPreviewPicture);
+      cinematicMotion.removeEventListener('change', settleInterruptedReveal);
+      previewReveal = 'holding';
       motionPreference.removeEventListener('change', finishIfReduced);
       beginIntro = undefined;
       finishIntro = undefined;
@@ -198,6 +253,12 @@
     if (event.target === event.currentTarget && event.animationName === 'hero-arrival-image') finishIntro?.();
   }
 
+  function finishPreviewReveal(event: AnimationEvent) {
+    if (previewReveal === 'playing' && event.target === event.currentTarget && event.animationName === 'hero-preview-pullback') {
+      previewReveal = 'complete';
+    }
+  }
+
   // Splits a line around its emphasised phrase so a highlight can wipe in behind it.
   function emphasisParts(copy: string, phrase?: string) {
     const at = phrase ? copy.indexOf(phrase) : -1;
@@ -226,24 +287,51 @@
   const portraitCrop = '(max-width: 850px), (max-aspect-ratio: 5/4)';
 </script>
 
+{#snippet openingTitle()}
+  <div class="hero-name" data-hero-type>
+    <ArtistOpening arrivalDuration={introPhase === 'revealing' ? arrivalDuration : 0} />
+    <span class="hero-name-first" aria-hidden="true">
+      {#each firstChars as item, index (item.id)}
+        <span class="hero-char" data-hero-char data-char={item.char} style:--arrival-index={index}>{item.char}</span>
+      {/each}
+    </span>
+    <span class="hero-name-last" aria-hidden="true">
+      {#each lastChars as item, index (item.id)}
+        <span class="hero-char" data-hero-char data-char={item.char} style:--arrival-index={index + firstChars.length}>{item.char}</span>
+      {/each}
+    </span>
+  </div>
+{/snippet}
+
+{#snippet openingDetails()}
+  <div class="hero-meta" data-hero-details>
+    <p class="hero-origin" data-hero-meta-line>Bari, Italy <span></span> Boston, MA</p>
+    <p class="hero-roles" data-hero-meta-line>Drummer · Educator · Producer</p>
+    <p class="hero-credential" data-hero-meta-line>Associate Professor of Percussion<br />Berklee College of Music</p>
+  </div>
+{/snippet}
+
 <section
   class="artist-hero"
   data-motion-hero
   data-hero-sequence
   data-intro-phase={introPhase}
+  data-preview-reveal={revealOnLoad ? previewReveal : undefined}
   style:--hero-arrival-duration={arrivalDuration + 'ms'}
   data-opening-edit={openingEdit ? 'true' : undefined}
   {@attach mountHero}
   aria-labelledby="hero-title"
 >
   <h1 class="hero-accessible-title" id="hero-title" tabindex="-1">Sergio Bellotti</h1>
-  <ArtistLoader open={introPhase === 'waiting'} {soundPlaying} onenter={enterSite} />
+  {#if !revealOnLoad}
+    <ArtistLoader open={introPhase === 'waiting'} {soundPlaying} onenter={enterSite} />
+  {/if}
   <audio data-hero-soundtrack src={heroSession.soundtrack} preload="none" loop></audio>
   <div class="hero-stage" data-hero-stage>
     <div class="hero-camera" bind:this={camera}>
       <div class="hero-session" data-hero-session data-hero-video aria-hidden="true">
         <img class="hero-session-still" src={openingEdit?.poster ?? heroSession.poster} alt="" loading="lazy" decoding="async" />
-        <div class="hero-session-frame">
+        <div class="hero-session-frame" onanimationend={finishPreviewReveal}>
           <video
             data-hero-session-picture
             src={openingEdit?.picture ?? heroSession.picture}
@@ -256,17 +344,19 @@
           <canvas data-hero-grade></canvas>
         </div>
       </div>
-      <div class="hero-flow-cutaway" data-hero-flow data-hero-video aria-hidden="true">
-        <video
-          data-hero-flow-picture
-          src="/videos/sergio-flow-insert.mp4"
-          poster="/videos/sergio-flow-insert-poster.webp"
-          muted
-          playsinline
-          preload="none"
-          loop
-        ></video>
-      </div>
+      {#if showFlowCutaway}
+        <div class="hero-flow-cutaway" data-hero-flow data-hero-video aria-hidden="true">
+          <video
+            data-hero-flow-picture
+            src="/videos/sergio-flow-insert.mp4"
+            poster="/videos/sergio-flow-insert-poster.webp"
+            muted
+            playsinline
+            preload="none"
+            loop
+          ></video>
+        </div>
+      {/if}
       <div class="hero-poster" data-hero-poster>
         <div class="hero-plate" data-hero-backdrop onanimationend={finishArrival}>
           {#if openingEdit}
@@ -297,19 +387,9 @@
         </div>
         <div class="hero-poster-vignette"></div>
       </div>
-      <div class="hero-name" data-hero-type>
-        <ArtistOpening arrivalDuration={introPhase === 'revealing' ? arrivalDuration : 0} />
-        <span class="hero-name-first" aria-hidden="true">
-          {#each firstChars as item, index (item.id)}
-            <span class="hero-char" data-hero-char data-char={item.char} style:--arrival-index={index}>{item.char}</span>
-          {/each}
-        </span>
-        <span class="hero-name-last" aria-hidden="true">
-          {#each lastChars as item, index (item.id)}
-            <span class="hero-char" data-hero-char data-char={item.char} style:--arrival-index={index + firstChars.length}>{item.char}</span>
-          {/each}
-        </span>
-      </div>
+      {#if !lowerTitle}
+        {@render openingTitle()}
+      {/if}
 
       <div class="hero-sponsor-atmosphere" data-hero-sponsor-atmosphere aria-hidden="true"><span></span><span></span></div>
       {#each sponsors as sponsor (sponsor.id)}
@@ -354,9 +434,9 @@
           <div class="hero-chapter-copy">
             <p class="hero-chapter-kicker" data-chapter-line><i class="hero-chapter-rule" aria-hidden="true"></i><span data-chapter-kicker>{chapter.kicker}</span></p>
             <h2 id={`hero-chapter-${chapter.id}`} aria-label={chapter.title} data-chapter-line data-chapter-title>
-              {#each chapter.title.split(' ') as word}
+              {#each chapter.title.split(' ') as word, wordIndex (wordIndex)}
                 <span class="hero-title-word" aria-hidden="true">
-                  {#each [...word] as char}<span class="hero-title-char" data-hero-title-char data-char={char}>{char}</span>{/each}
+                  {#each [...word] as char, charIndex (charIndex)}<span class="hero-title-char" data-hero-title-char data-char={char}>{char}</span>{/each}
                 </span>
               {/each}
             </h2>
@@ -396,6 +476,9 @@
       {/key}
     {/if}
     <div class="hero-grain" aria-hidden="true" use:filmGrain></div>
+    {#if revealOnLoad && previewReveal === 'playing'}
+      <div class="hero-preview-light" aria-hidden="true"></div>
+    {/if}
     {#if introPhase === 'revealing'}
       <div class="hero-arrival-burst" aria-hidden="true"><span></span><span></span></div>
     {/if}
@@ -404,17 +487,20 @@
       <span data-scramble>Scroll to enter the performance</span><i></i>
     </div>
 
-    <div class="hero-meta" data-hero-details>
-      <p class="hero-origin" data-hero-meta-line>Bari, Italy <span></span> Boston, MA</p>
-      <p class="hero-roles" data-hero-meta-line>Drummer · Educator · Producer</p>
-      <p class="hero-credential" data-hero-meta-line>Associate Professor of Percussion<br />Berklee College of Music</p>
-    </div>
+    {#if lowerTitle}
+      <div class="hero-opening-credits">
+        {@render openingTitle()}
+        {@render openingDetails()}
+      </div>
+    {:else}
+      {@render openingDetails()}
+    {/if}
 
     <div class="hero-dock">
       <div class="hero-dock-left">
-        <a class="hero-scroll" href={comparisonHref}>
+        <a class="hero-scroll" href={comparisonHref} aria-label="Hear the difference">
           <ArrowDownIcon size={17} weight="bold" />
-          <span data-scramble>Hear the difference</span>
+          <span>Hear the difference</span>
         </a>
       </div>
 
@@ -425,11 +511,11 @@
         </button>
         <button class="hero-strike" type="button" aria-label="Strike cymbal" onclick={strike}>
           <WaveformIcon size={19} weight="regular" />
-          <span data-scramble>Strike cymbal</span>
+          <span>Strike cymbal</span>
         </button>
-        <a class="hero-watch" href={filmHref} onclick={playReel}>
+        <a class="hero-watch" href={filmHref} aria-label="Watch performance" onclick={playReel}>
           <PlayIcon size={15} weight="fill" />
-          <span data-scramble>Watch performance</span>
+          <span>Watch performance</span>
         </a>
       </div>
     </div>

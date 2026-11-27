@@ -16,6 +16,7 @@ export const studioCymbal: CymbalGeometry = { x: 920 / 1920, y: 870 / 1080, r: 3
 
 const frameInterval = 1000 / 30;
 const ringDuration = 1.6;
+const resizeSettle = 120;
 
 const vertexSource = `
   attribute vec2 aPosition;
@@ -229,6 +230,9 @@ export function createCymbalLight(canvas: HTMLCanvasElement, stage: HTMLElement,
   let sweepProgress = 0
   let level = 0
   let uploaded = false
+  let backingReady = false
+  let layoutDirty = true
+  let resizeAfter = Infinity
   let width = 1
   let height = 1
   let layout = 1
@@ -247,19 +251,22 @@ export function createCymbalLight(canvas: HTMLCanvasElement, stage: HTMLElement,
     gl.bindTexture(gl.TEXTURE_2D, resources.texture)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, photo)
     uploaded = true
-    measure()
-    schedule()
+    layoutDirty = true
   }
 
-  function measure() {
+  function measure(now: number) {
     const box = canvas.getBoundingClientRect()
     if (!box.width || !box.height || !photo?.naturalWidth || !poster) return
 
     const density = Math.min(0.72, 1180 / box.width, 760 / box.height)
     width = Math.max(1, Math.round(box.width * density))
     height = Math.max(1, Math.round(box.height * density))
-    if (canvas.width !== width) canvas.width = width
-    if (canvas.height !== height) canvas.height = height
+    if (!backingReady || now >= resizeAfter) {
+      if (canvas.width !== width) canvas.width = width
+      if (canvas.height !== height) canvas.height = height
+      backingReady = true
+      resizeAfter = Infinity
+    }
 
     const scale = posterScale(poster)
     const frame = photo.getBoundingClientRect()
@@ -275,10 +282,13 @@ export function createCymbalLight(canvas: HTMLCanvasElement, stage: HTMLElement,
     }
     center = { x: image.x + geometry.x * image.width, y: image.y + geometry.y * image.height }
     radius = Math.max(1, geometry.r * image.width)
+    layoutDirty = false
   }
 
   function render(now: number) {
     if (!gl || !resources) return
+    upload()
+    if (layoutDirty || now >= resizeAfter) measure(now)
 
     // With nothing to follow, the light drifts slowly along the upper arc so the bronze keeps breathing.
     const angle = motion.matches ? -2.1 : -Math.PI / 2 + Math.sin(now * 0.00016) * 1.2
@@ -298,7 +308,8 @@ export function createCymbalLight(canvas: HTMLCanvasElement, stage: HTMLElement,
     const since = (now - strikeAt) / 1000
     const { uniforms } = resources
 
-    gl.viewport(0, 0, width, height)
+    // The shader uses the current layout; the old backing store can scale until it settles.
+    gl.viewport(0, 0, canvas.width, canvas.height)
     gl.clearColor(0, 0, 0, 0)
     gl.clear(gl.COLOR_BUFFER_BIT)
     gl.uniform2f(uniforms.size, width, height)
@@ -326,12 +337,13 @@ export function createCymbalLight(canvas: HTMLCanvasElement, stage: HTMLElement,
       level = 0
       return
     }
-    if (now - lastFrame >= frameInterval) {
+    if (now - lastFrame >= frameInterval || (motion.matches && (layoutDirty || now >= resizeAfter))) {
       lastFrame = now
       render(now)
     }
     // The light keeps drifting while the title frame is on screen; a still frame only needs redrawing mid-fade.
-    if ((goal === 1 && (!motion.matches || animating(now))) || (level > 0 && level < 1)) raf = requestAnimationFrame(frame)
+    if ((goal === 1 && (!motion.matches || animating(now) || (uploaded && resizeAfter !== Infinity))) ||
+        (level > 0 && level < 1)) raf = requestAnimationFrame(frame)
   }
 
   function schedule() {
@@ -366,8 +378,8 @@ export function createCymbalLight(canvas: HTMLCanvasElement, stage: HTMLElement,
         return
       }
       uploaded = false
-      measure()
-      upload()
+      backingReady = false
+      layoutDirty = true
     }
     schedule()
   }
@@ -404,14 +416,23 @@ export function createCymbalLight(canvas: HTMLCanvasElement, stage: HTMLElement,
     raf = 0
   }
 
+  function photoChanged() {
+    uploaded = false
+    layoutDirty = true
+    schedule()
+  }
+
+  function layoutChanged() {
+    layoutDirty = true
+    resizeAfter = performance.now() + resizeSettle
+    schedule()
+  }
+
   const intersection = new IntersectionObserver(([entry]) => {
     inView = entry.isIntersecting
     start()
   })
-  const size = new ResizeObserver(() => {
-    measure()
-    schedule()
-  })
+  const size = new ResizeObserver(layoutChanged)
   const scene = new MutationObserver(schedule)
 
   intersection.observe(stage)
@@ -420,8 +441,9 @@ export function createCymbalLight(canvas: HTMLCanvasElement, stage: HTMLElement,
   scene.observe(stage, { attributes: true, attributeFilter: ['data-opening-scrub'] })
   stage.addEventListener('pointermove', aim, { passive: true })
   stage.addEventListener('pointerleave', release)
-  photo?.addEventListener('load', upload)
+  photo?.addEventListener('load', photoChanged)
   document.addEventListener('visibilitychange', start)
+  window.addEventListener('resize', layoutChanged)
   motion.addEventListener('change', release)
   hover.addEventListener('change', release)
   canvas.addEventListener('webglcontextlost', handleContextLoss)
@@ -461,8 +483,9 @@ export function createCymbalLight(canvas: HTMLCanvasElement, stage: HTMLElement,
       scene.disconnect()
       stage.removeEventListener('pointermove', aim)
       stage.removeEventListener('pointerleave', release)
-      photo?.removeEventListener('load', upload)
+      photo?.removeEventListener('load', photoChanged)
       document.removeEventListener('visibilitychange', start)
+      window.removeEventListener('resize', layoutChanged)
       motion.removeEventListener('change', release)
       hover.removeEventListener('change', release)
       canvas.removeEventListener('webglcontextlost', handleContextLoss)

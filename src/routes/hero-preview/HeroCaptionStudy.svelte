@@ -183,9 +183,9 @@
       {#each heroChapters as chapter (chapter.id)}
         <article class="caption-panel" data-caption-panel={chapter.id}>
           <h2 class="caption-title" aria-label={chapter.title}>
-            {#each chapter.title.split(' ') as word}
+            {#each chapter.title.split(' ') as word, wordIndex (wordIndex)}
               <span class="caption-word" aria-hidden="true">
-                {#each [...word] as letter}<span class="caption-letter">{letter}</span>{/each}
+                {#each [...word] as letter, letterIndex (letterIndex)}<span class="caption-letter">{letter}</span>{/each}
               </span>
             {/each}
           </h2>

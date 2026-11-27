@@ -26,13 +26,6 @@ export interface HeroOpeningEdit {
   soundDuringOpening?: boolean;
 }
 
-export const studioOpeningEdit: HeroOpeningEdit = {
-  picture: '/motion/sergio-studio-opening-preview.mp4',
-  poster: '/motion/sergio-studio-opening-poster.webp',
-  handoff: 176 / 30,
-  frameRate: 30,
-};
-
 export const widePerformanceFraming: HeroFraming = { scale: 1, xPercent: 0, yPercent: 0, shade: .74, brightness: 1, saturation: 1 };
 
 export const notesFilm = {
@@ -46,6 +39,14 @@ export const heroSession = {
   picture: '/videos/sergio-hero-session.mp4',
   soundtrack: '/videos/sergio-hero-soundtrack.m4a',
   poster: '/videos/sergio-hero-session-poster.webp',
+};
+
+export const performanceOpeningEdit: HeroOpeningEdit = {
+  picture: heroSession.picture,
+  poster: '/motion/sergio-studio-opening-poster.webp',
+  handoff: 0,
+  frameRate: 30,
+  soundDuringOpening: true,
 };
 
 export const heroChapters: HeroChapter[] = [

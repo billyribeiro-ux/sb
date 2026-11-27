@@ -5,12 +5,10 @@
   import { cinematicMotion } from '#lib/motion/cinematic-motion';
   import GalleryDialog from '#lib/components/GalleryDialog.svelte';
   import PerformanceFilm from '#lib/components/PerformanceFilm.svelte';
-  import { notesFilm, studioOpeningEdit } from '#lib/hero/hero-chapters';
+  import { notesFilm, performanceOpeningEdit } from '#lib/hero/hero-chapters';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import SpotifyLogoIcon from 'phosphor-svelte/lib/SpotifyLogoIcon';
   import './home.css';
-
-  const openingEdit = { ...studioOpeningEdit, soundDuringOpening: true };
 
   let reelOpen = $state(false);
   let galleryIndex = $state<number | null>(null);
@@ -34,7 +32,7 @@
 </svelte:head>
 
 <div class="home" use:cinematicMotion>
-  <ArtistHero {openingEdit} bind:filmOpen={reelOpen} />
+  <ArtistHero openingEdit={performanceOpeningEdit} lowerTitle revealOnLoad showFlowCutaway={false} bind:filmOpen={reelOpen} />
 
   <section class="reel" id="performance-film" aria-labelledby="reel-title">
     <div class="shell reel-top" data-motion-reveal>
