@@ -15,6 +15,7 @@ const filmPace: Pace = { glide: 380, speed: 1 }
 export function filmWheel(scope: HTMLElement, pace: Pace = filmPace) {
   let target = 0
   let current = 0
+  let lastAppliedY = 0
   let previous = 0
   let raf = 0
 
@@ -31,7 +32,9 @@ export function filmWheel(scope: HTMLElement, pace: Pace = filmPace) {
 
   function glide(now: number) {
     raf = 0
-    const seconds = Math.min(64, now - previous) / 1000
+    // Native scroll jumps and open dialogs take over a pending wheel glide.
+    if (Math.abs(window.scrollY - lastAppliedY) > 1 || document.querySelector('dialog[open]')) return
+    const seconds = Math.max(0, Math.min(64, now - previous)) / 1000
     previous = now
     const gap = target - current
     const step = Math.sign(gap) * Math.min(
@@ -40,6 +43,7 @@ export function filmWheel(scope: HTMLElement, pace: Pace = filmPace) {
     )
     current += Math.abs(gap) - Math.abs(step) < 0.5 ? gap : step
     window.scrollTo({ top: current, behavior: 'instant' })
+    lastAppliedY = window.scrollY
     if (Math.abs(target - current) > 0.5) raf = requestAnimationFrame(glide)
   }
 
@@ -51,7 +55,7 @@ export function filmWheel(scope: HTMLElement, pace: Pace = filmPace) {
     if ((event.deltaY < 0 && film.y <= film.start) ||
         (event.deltaY > 0 && film.y >= film.end - 1 && Math.abs(target - current) < 1)) return
     // Keys, touch or the scrollbar moved the page behind our back: start from where they left it.
-    if (!raf) target = current = film.y
+    if (!raf || Math.abs(film.y - lastAppliedY) > 1) target = current = lastAppliedY = film.y
     const lines = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1
     target = Math.min(film.end, Math.max(film.start, target + event.deltaY * lines))
     event.preventDefault()

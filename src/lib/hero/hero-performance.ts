@@ -11,7 +11,7 @@ export function mountHeroPerformance(
   video: HTMLVideoElement,
   audio: HTMLAudioElement,
   onSoundChange: (playing: boolean) => void,
-  flow: HTMLVideoElement,
+  flow: HTMLVideoElement | null,
   openingEdit?: HeroOpeningEdit,
 ) {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -50,8 +50,10 @@ export function mountHeroPerformance(
   video.defaultMuted = true;
   video.muted = true;
   updatePreload();
-  flow.defaultMuted = true;
-  flow.muted = true;
+  if (flow) {
+    flow.defaultMuted = true;
+    flow.muted = true;
+  }
 
   const onStage = () => stageVisible && !blocked && !document.hidden;
   const soundAllowed = () => entered && !blocked && !document.hidden && soundChoice !== 'off' &&
@@ -179,8 +181,8 @@ export function mountHeroPerformance(
   function seekOpening(progress: number) {
     if (!openingEdit) return;
     scrubbingOpening = progress < 1 && !reducedMotion.matches;
-    stage.toggleAttribute('data-opening-scrub', scrubbingOpening && progress > .01);
-    const lastFrame = Math.round(performanceOffset * openingEdit.frameRate) - 1;
+    stage.toggleAttribute('data-opening-scrub', performanceOffset > 0 && scrubbingOpening && progress > .01);
+    const lastFrame = Math.max(0, Math.round(performanceOffset * openingEdit.frameRate) - 1);
     const amount = Math.max(0, Math.min(1, (progress - .01) / .94));
     openingTime = Math.round(lastFrame * amount) / openingEdit.frameRate;
     if (openingEdit.soundDuringOpening && (scrubbingOpening || !pictureActive)) {
@@ -218,14 +220,14 @@ export function mountHeroPerformance(
   function updatePicture() {
     if (!onStage() || !pictureActive || reducedMotion.matches) {
       video.pause();
-      flow.pause();
+      flow?.pause();
       return;
     }
 
     alignPicture();
     if (video.paused && !video.ended) void video.play().catch(() => {});
-    if (!cutawayActive) flow.pause();
-    else if (flow.paused) void flow.play().catch(() => {});
+    if (!cutawayActive) flow?.pause();
+    else if (flow?.paused) void flow.play().catch(() => {});
   }
 
   function update() {
@@ -237,7 +239,7 @@ export function mountHeroPerformance(
 
   function updatePreload() {
     video.preload = reducedMotion.matches ? 'none' : openingEdit && entered ? 'auto' : 'metadata';
-    flow.preload = !reducedMotion.matches && entered ? 'metadata' : 'none';
+    if (flow) flow.preload = !reducedMotion.matches && entered ? 'metadata' : 'none';
   }
 
   function onMotionChange() {
@@ -294,6 +296,8 @@ export function mountHeroPerformance(
     if (soundPlaying) return;
     if (pendingSound) pauseSound();
     needsGesture = false;
+    prepareGain();
+    updatePicture();
     playSound(true);
   }
 
@@ -325,7 +329,8 @@ export function mountHeroPerformance(
   return {
     setPictureActive(active: boolean, matchingOpening = false) {
       if (pictureActive === active && holdingOpeningAngle === matchingOpening) return;
-      if (openingEdit && active && !pictureActive) {
+      const joinsPlayingSound = performanceOffset === 0 && !audio.paused;
+      if (openingEdit && active && !pictureActive && !joinsPlayingSound) {
         joiningPerformance = true;
         cancelAnimationFrame(fadeFrame);
         fadeFrame = 0;
@@ -380,7 +385,7 @@ export function mountHeroPerformance(
       stage.removeAttribute('data-opening-ready');
       stage.removeAttribute('data-opening-scrub');
       video.pause();
-      flow.pause();
+      flow?.pause();
       pauseSound();
       const context = gainContext;
       gainContext = undefined;

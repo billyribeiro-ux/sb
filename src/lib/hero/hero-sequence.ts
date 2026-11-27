@@ -1,7 +1,8 @@
 import type { Action } from 'svelte/action';
 import { heroChapters, performanceStart, widePerformanceFraming, type HeroFraming } from './hero-chapters';
 
-const motionQuery = '(prefers-reduced-motion: no-preference) and (min-height: 35rem)';
+export const heroMotionQuery = '(prefers-reduced-motion: no-preference)';
+const heroLaunchQuery = `${heroMotionQuery} and (min-height: 35rem)`;
 const closingLead = .032;
 const closingTail = .074;
 const captionLead = .026;
@@ -24,6 +25,7 @@ function framingStyles(framing: HeroFraming) {
 
 export interface HeroSequenceOptions {
   openingEdit?: boolean;
+  playFromStart?: boolean;
   arrivedThroughIntro?: boolean;
   onOpeningProgress?: (progress: number) => void;
   sweepCymbal?: (progress: number) => void;
@@ -33,6 +35,7 @@ export interface HeroSequenceOptions {
 
 export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, options = {}) => {
   const element = (name: string) => root.querySelector<HTMLElement>(`[data-hero-${name}]`);
+  const stage = element('stage');
   const portrait = element('poster');
   const backdrop = element('backdrop');
   const session = element('session');
@@ -49,14 +52,16 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
   const maskBottom = element('mask-bottom');
   const streak = element('streak');
   const chapters = [...root.querySelectorAll<HTMLElement>('[data-hero-chapter]')];
-  if (!portrait || !backdrop || !session || !type || !details || !light ||
+  if (!stage || !portrait || !backdrop || !session || !type || !details || !light ||
       !film || !caption || chapters.length !== heroChapters.length) return;
 
   const layers = {
-    portrait, backdrop, session, type, details, light, film, caption,
+    stage, portrait, backdrop, session, type, details, light, film, caption,
     flash, lightLeak, scrollInstruction, maskTop, maskBottom, streak,
   };
-  const preference = window.matchMedia(motionQuery);
+  const launch = window.matchMedia(heroLaunchQuery);
+  let initialHash = launch.matches ? location.hash : '';
+  const runwayEnd = () => `+=${root.clientHeight - stage.clientHeight}`;
   let disposed = false;
   let revert: (() => void) | undefined;
 
@@ -68,7 +73,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
     if (disposed) return;
 
     const {
-      portrait, backdrop, session, type, details, light, film, caption,
+      stage, portrait, backdrop, session, type, details, light, film, caption,
       flash, lightLeak, scrollInstruction, maskTop, maskBottom, streak,
     } = layers;
     const discovery = chapters[chapters.length - 1];
@@ -112,8 +117,20 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
     const queries = gsap.matchMedia(root);
     revert = () => queries.revert();
 
-    queries.add(motionQuery, () => {
+    queries.add(heroMotionQuery, () => {
       root.dataset.cinematic = 'true';
+      // Keep chapter positions fixed while the stage follows the viewport.
+      const screens = Number.parseFloat(getComputedStyle(root).getPropertyValue('--hero-runway'));
+      const distance = stage.getBoundingClientRect().height * screens;
+      if (distance > 0 && Number.isFinite(distance)) root.style.setProperty('--hero-runway-distance', `${distance}px`);
+
+      // The browser can land on an anchor before the cinematic runway exists.
+      const anchor = initialHash === location.hash ? document.getElementById(initialHash.slice(1)) : null;
+      initialHash = '';
+      if (anchor && !root.contains(anchor) && (root.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+        anchor.scrollIntoView({ behavior: 'instant' });
+      }
+
       const illumination = { progress: 0 };
       const openingSweep = { progress: 0 };
       let pictureActive = false;
@@ -185,7 +202,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
       const openingBlendStart = openingStart - .024;
       const openingBlendEnd = openingStart + .065;
       const openingHandoff = editedOpening ? openingStart * .72 : openingStart;
-      const sessionPlayback = editedOpening ? openingHandoff : openingBlendStart - .026;
+      const sessionPlayback = options.playFromStart ? 0 : editedOpening ? openingHandoff : openingBlendStart - .026;
       const grooveCaptionStart = openingStart - (editedOpening ? .048 : captionLead);
       const closingEnd = discoveryStart + closingTail;
       const typeTravel = gsap.utils.clamp(44, 76, window.innerHeight * .085);
@@ -202,6 +219,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
       const captionMoments: CaptionMoment[] = [];
       let captionsInitialized = false;
       let lastCaptionProgress = 0;
+      let lastCaptionIndex = -1;
 
       function captionMoment(
         lines: NodeListOf<HTMLElement>,
@@ -264,16 +282,19 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
       }
 
       function syncCaptions(progress: number) {
-        const jumped = Math.abs(progress - lastCaptionProgress) > .12;
-        lastCaptionProgress = progress;
         const latestIndex = captionMoments.findLastIndex(moment => progress >= moment.start);
-        if (!captionsInitialized || jumped) {
+        const shouldResetCues = !captionsInitialized || latestIndex < lastCaptionIndex || latestIndex > lastCaptionIndex + 1 ||
+          (latestIndex !== lastCaptionIndex && Math.abs(progress - lastCaptionProgress) > .12);
+        lastCaptionProgress = progress;
+        lastCaptionIndex = latestIndex;
+        if (shouldResetCues) {
           for (const [index, moment] of captionMoments.entries()) {
-            if (index >= latestIndex || moment.started) continue;
-            moment.started = true;
-            moment.completed = true;
-            moment.exitRequested = true;
-            moment.animation.progress(1, true).pause();
+            if (index === latestIndex && moment.started && !moment.completed && !moment.exitRequested) continue;
+            const skipped = index < latestIndex;
+            moment.started = skipped;
+            moment.completed = skipped;
+            moment.exitRequested = skipped;
+            moment.animation.pause(skipped ? moment.animation.duration() : 0, true);
           }
           captionsInitialized = true;
         }
@@ -294,9 +315,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
           }
         }
         if (activeIndex >= 0) return;
-        const targetIndex = jumped
-          ? latestIndex
-          : captionMoments.findIndex(moment => !moment.completed && progress >= moment.start);
+        const targetIndex = captionMoments.findIndex(moment => !moment.completed && progress >= moment.start);
         const target = captionMoments[targetIndex];
         if (!target || target.started) return;
         target.started = true;
@@ -435,20 +454,20 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
       if (editedOpening) {
         const sponsorMoments = [
           {
-            id: 'sabian', at: .035, exitAt: .173, holdAt: 2.75,
-            animation: sponsorMoment('sabian', 1.9, .85, .95), triggered: false, queued: false, exitRequested: false,
+            at: .035, exitAt: .173, holdAt: 2.75,
+            animation: sponsorMoment('sabian', 1.9, .85, .95), exitRequested: false,
           },
           {
-            id: 'yamaha', at: .278, exitAt: .338, holdAt: 2.5,
-            animation: sponsorMoment('yamaha', 1.7, .8, .9), triggered: false, queued: false, exitRequested: false,
+            at: .278, exitAt: .338, holdAt: 2.5,
+            animation: sponsorMoment('yamaha', 1.7, .8, .9), exitRequested: false,
           },
           {
-            id: 'remo', at: .47, exitAt: .53, holdAt: 2.5,
-            animation: sponsorMoment('remo', 1.7, .8, .9), triggered: false, queued: false, exitRequested: false,
+            at: .47, exitAt: .53, holdAt: 2.5,
+            animation: sponsorMoment('remo', 1.7, .8, .9), exitRequested: false,
           },
           {
-            id: 'prologix', at: .76, exitAt: .84, holdAt: 2.5,
-            animation: sponsorMoment('prologix', 1.7, .8, .9), triggered: false, queued: false, exitRequested: false,
+            at: .76, exitAt: .84, holdAt: 2.5,
+            animation: sponsorMoment('prologix', 1.7, .8, .9), exitRequested: false,
           },
         ];
         type SponsorMoment = (typeof sponsorMoments)[number];
@@ -462,55 +481,53 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         }
 
         function startSponsor(moment: SponsorMoment) {
-          if (!moment.animation || activeSponsor === moment) return;
-          if (activeSponsor) {
-            moment.queued = true;
-            return;
-          }
+          if (!moment.animation) return;
           activeSponsor = moment;
-          moment.triggered = true;
-          moment.queued = false;
+          moment.exitRequested = false;
           moment.animation.eventCallback('onComplete', () => {
+            if (activeSponsor !== moment) return;
             activeSponsor = undefined;
-            const next = sponsorMoments.find(candidate => candidate.queued && sponsorProgress >= candidate.at);
-            if (next) startSponsor(next);
+            syncSponsors(sponsorProgress);
           }).play(0);
         }
 
         function syncSponsors(progress: number) {
+          const jumped = Math.abs(progress - sponsorProgress) > .12;
           sponsorProgress = progress;
-          for (const moment of sponsorMoments) {
-            if (progress < moment.at) {
-              moment.queued = false;
-              if (moment !== activeSponsor) {
-                moment.triggered = false;
-                moment.exitRequested = false;
-                moment.animation?.pause(0);
-              }
-              continue;
+          const target = sponsorMoments.find(moment => progress >= moment.at && progress < moment.exitAt);
+          const current = activeSponsor;
+          if (current && current !== target) {
+            if (jumped || progress < current.at) {
+              current.animation?.pause(current.animation.duration(), true);
+              activeSponsor = undefined;
+            } else {
+              current.exitRequested = true;
+              if (current.animation?.paused()) current.animation.play();
             }
-            if (progress >= moment.exitAt) moment.exitRequested = true;
-            if (!moment.triggered || moment.queued) {
-              startSponsor(moment);
-            } else if (moment.exitRequested && moment.animation?.paused()) {
-              moment.animation.play();
+          } else if (current?.exitRequested) {
+            current.exitRequested = false;
+            if (current.animation && current.animation.time() >= current.holdAt) {
+              current.animation.pause(current.holdAt, true);
             }
           }
+          if (!activeSponsor && target) startSponsor(target);
         }
 
         const sponsorTrigger = ScrollTrigger.create({
           trigger: root,
           start: 'top top',
-          end: 'bottom bottom',
+          end: runwayEnd,
           onUpdate: self => syncSponsors(self.progress),
           onRefresh: self => syncSponsors(self.progress),
         });
         syncSponsors(sponsorTrigger.progress);
         // The pullback and first performance angle are frames of the same edit.
-        timeline
-          .set(session, { autoAlpha: 1, '--session-live-opacity': 1, '--session-shade': 0 }, 0)
-          .to(portrait, { '--hero-opening-grade': 0, duration: openingHandoff * .66, ease: 'sine.inOut' }, openingHandoff * .34)
-          .set(portrait, { autoAlpha: 0 }, openingHandoff);
+        timeline.set(session, { autoAlpha: 1, '--session-live-opacity': 1, '--session-shade': 0 }, 0);
+        if (!options.playFromStart) {
+          timeline
+            .to(portrait, { '--hero-opening-grade': 0, duration: openingHandoff * .66, ease: 'sine.inOut' }, openingHandoff * .34)
+            .set(portrait, { autoAlpha: 0 }, openingHandoff);
+        }
       } else {
         timeline
           .to(illumination, { progress: 1, duration: openingStart, ease: 'sine.inOut' }, 0)
@@ -631,10 +648,11 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         if (mask) timeline.to(mask, { yPercent: direction * 101, duration: closingTail * .9, ease: 'power2.inOut' }, discoveryStart + .01);
       }
 
+      captionMoments.sort((a, b) => a.start - b.start);
       const captionTrigger = ScrollTrigger.create({
         trigger: root,
         start: 'top top',
-        end: 'bottom bottom',
+        end: runwayEnd,
         onUpdate: self => syncCaptions(self.progress),
         onRefresh: self => syncCaptions(self.progress),
       });
@@ -712,7 +730,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         animation: timeline,
         trigger: root,
         start: 'top top',
-        end: 'bottom bottom',
+        end: runwayEnd,
         scrub: 1.6,
         onRefresh: sync,
       });
@@ -752,6 +770,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
         film.setAttribute('aria-hidden', 'true');
         delete root.dataset.scene;
         delete root.dataset.cinematic;
+        root.style.removeProperty('--hero-runway-distance');
       };
     });
 
@@ -761,18 +780,18 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
   }
 
   function mountWhenAllowed() {
-    if (!preference.matches) return;
-    preference.removeEventListener('change', mountWhenAllowed);
+    if (!launch.matches) return;
+    launch.removeEventListener('change', mountWhenAllowed);
     void install().catch(() => revert?.());
   }
 
-  preference.addEventListener('change', mountWhenAllowed);
+  launch.addEventListener('change', mountWhenAllowed);
   mountWhenAllowed();
 
   return {
     destroy() {
       disposed = true;
-      preference.removeEventListener('change', mountWhenAllowed);
+      launch.removeEventListener('change', mountWhenAllowed);
       revert?.();
     },
   };

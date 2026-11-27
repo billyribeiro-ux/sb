@@ -43,6 +43,8 @@ const fragmentSource = `
   }
 `;
 
+const resizeSettle = 120;
+
 function compile(gl: WebGLRenderingContext, kind: number, source: string) {
   const shader = gl.createShader(kind);
   if (!shader) return null;
@@ -66,6 +68,9 @@ export function createDepthPortrait(
   let progress = 0;
   let inView = false;
   let ready = false;
+  let backingReady = false;
+  let layoutDirty = true;
+  let resizeAfter = Infinity;
   let previousTime = 0;
   let x = 0;
   let y = 0;
@@ -98,12 +103,13 @@ export function createDepthPortrait(
     x += (targetX - x) * smoothing;
     y += (targetY - y) * smoothing;
     gl.useProgram(program);
+    if (layoutDirty || now >= resizeAfter) measure(now);
     gl.uniform2f(uniforms.uPointer, x, y);
     gl.uniform1f(uniforms.uProgress, motion.matches ? progress : 0);
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     if (!plate.hasAttribute('data-depth-ready')) plate.dataset.depthReady = 'true';
-    if (Math.abs(targetX - x) + Math.abs(targetY - y) > .002) schedule();
+    if (Math.abs(targetX - x) + Math.abs(targetY - y) > .002 || resizeAfter !== Infinity) schedule();
   }
 
   function upload(unit: number, name: string, pixels: TexImageSource) {
@@ -121,23 +127,35 @@ export function createDepthPortrait(
     gl.uniform1i(gl.getUniformLocation(program, name), unit);
   }
 
-  function resize() {
+  function measure(now: number) {
     if (!gl || !program || !image.naturalWidth) return;
     const width = plate.clientWidth;
     const height = plate.clientHeight;
     if (!width || !height) return;
-    const density = Math.min(devicePixelRatio, 1.75, 2880 / width);
-    canvas.width = Math.round(width * density);
-    canvas.height = Math.round(height * density);
-    gl.useProgram(program);
+    if (!backingReady || now >= resizeAfter) {
+      const density = Math.min(devicePixelRatio, 1.75, 2880 / width);
+      const pixelWidth = Math.max(1, Math.round(width * density));
+      const pixelHeight = Math.max(1, Math.round(height * density));
+      if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
+      if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
+      backingReady = true;
+      resizeAfter = Infinity;
+    }
     gl.uniform2f(uniforms.uSize, width, height);
     gl.uniform1f(uniforms.uPhotoAspect, image.naturalWidth / image.naturalHeight);
+    layoutDirty = false;
+  }
+
+  function layoutChanged() {
+    layoutDirty = true;
+    resizeAfter = performance.now() + resizeSettle;
     schedule();
   }
 
   function clearResources() {
     stop();
     ready = false;
+    backingReady = false;
     delete plate.dataset.depthReady;
     if (!gl) return;
     textures.splice(0).forEach(texture => gl.deleteTexture(texture));
@@ -181,7 +199,7 @@ export function createDepthPortrait(
       }
       upload(0, 'uImage', image);
       ready = true;
-      resize();
+      layoutChanged();
     } catch {
       clearResources();
     }
@@ -211,13 +229,14 @@ export function createDepthPortrait(
     inView = entry.isIntersecting;
     if (inView) schedule(); else stop();
   });
-  const size = new ResizeObserver(resize);
+  const size = new ResizeObserver(layoutChanged);
   intersection.observe(stage);
   size.observe(plate);
   image.addEventListener('load', prepare);
   stage.addEventListener('pointermove', aim, { passive: true });
   stage.addEventListener('pointerleave', resetPointer);
   document.addEventListener('visibilitychange', visibility);
+  window.addEventListener('resize', layoutChanged);
   motion.addEventListener('change', preference);
   canvas.addEventListener('webglcontextlost', contextLost);
   canvas.addEventListener('webglcontextrestored', prepare);
@@ -239,6 +258,7 @@ export function createDepthPortrait(
       stage.removeEventListener('pointermove', aim);
       stage.removeEventListener('pointerleave', resetPointer);
       document.removeEventListener('visibilitychange', visibility);
+      window.removeEventListener('resize', layoutChanged);
       motion.removeEventListener('change', preference);
       canvas.removeEventListener('webglcontextlost', contextLost);
       canvas.removeEventListener('webglcontextrestored', prepare);

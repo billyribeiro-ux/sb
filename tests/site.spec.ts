@@ -1,15 +1,8 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
-import { studioOpeningEdit } from '../src/lib/hero/hero-chapters';
+import { heroSession } from '../src/lib/hero/hero-chapters';
 
-function artistIntro(page: Page) {
-  return page.getByRole('dialog', { name: 'Sergio Bellotti', exact: true });
-}
-
-async function skipArtistIntro(page: Page) {
-  const intro = artistIntro(page);
-  await intro.getByRole('button', { name: 'Skip intro' }).click();
-  await expect(intro).toBeHidden();
+async function waitForCinematicHero(page: Page) {
   await expect(page.locator('[data-hero-sequence]')).toHaveAttribute('data-cinematic', 'true');
   await expect(page.locator('[data-hero-soundtrack]')).toHaveJSProperty('paused', true);
 }
@@ -42,7 +35,7 @@ test.beforeEach(async ({ page }) => {
 
 test('loads all six editorial pages with working navigation', async ({ page }) => {
   await page.goto('/');
-  await skipArtistIntro(page);
+  await waitForCinematicHero(page);
   await expect(page.getByRole('heading', { level: 1 })).toHaveAccessibleName('Sergio Bellotti');
   const nav = page.getByRole('navigation', { name: 'Primary' });
   const routes = [
@@ -94,7 +87,7 @@ test('replays the Bari to Boston route and shows it statically with reduced moti
 
 test('opens, navigates, and closes the gallery with the keyboard', async ({ page }) => {
   await page.goto('/');
-  await skipArtistIntro(page);
+  await waitForCinematicHero(page);
   const trigger = page.getByRole('link', { name: 'Enlarge photograph: On the kit' });
   await trigger.click();
   const dialog = page.getByRole('dialog');
@@ -109,7 +102,7 @@ test('opens, navigates, and closes the gallery with the keyboard', async ({ page
 
 test('activates video on demand and restores focus', async ({ page }) => {
   await page.goto('/');
-  await skipArtistIntro(page);
+  await waitForCinematicHero(page);
   const trigger = page.getByRole('link', { name: 'Watch performance' });
   const dialog = page.getByRole('dialog', { name: 'Happy People 7/4' });
   await trigger.click();
@@ -126,7 +119,7 @@ test('mobile menu works and reduced-motion layout stays within the viewport', as
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
-  await expect(artistIntro(page)).toBeHidden();
+  await expect(page.locator('[data-artist-loader]')).toHaveCount(0);
   const menu = page.getByRole('button', { name: 'Open menu' });
   await menu.click();
   const shown = page.getByRole('button', { name: 'Close menu' });
@@ -142,66 +135,137 @@ test('mobile menu works and reduced-motion layout stays within the viewport', as
   await expect(menu).toHaveAttribute('aria-expanded', 'false');
 });
 
-test('the inline opening runs on reload with navigation and Watch performance enabled', async ({ page }) => {
+test('the homepage reveals the performance automatically and repeats the opening on reload', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.goto('/');
-  await skipArtistIntro(page);
-  const opening = page.locator('[data-artist-opening]');
-  await expect(opening).toHaveAttribute('data-opening-motion', 'active');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  const hero = page.locator('[data-hero-sequence]');
+  const poster = hero.locator('[data-hero-poster]');
+  const picture = hero.locator('[data-hero-session-picture]');
+  await expect(hero).toHaveAttribute('data-preview-reveal', 'holding');
+  await expect(poster).toBeVisible();
+  await expect(page.locator('[data-artist-loader]')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Watch performance' })).toBeEnabled();
   await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
-  await page.reload();
-  await skipArtistIntro(page);
-  await expect(opening).toHaveAttribute('data-opening-motion', 'active');
+
+  await expect(hero).toHaveAttribute('data-preview-reveal', 'playing', { timeout: 12000 });
+  await expect(hero.locator('.hero-session-frame')).toHaveCSS('animation-duration', '3.4s');
+  await expect(hero).toHaveAttribute('data-preview-reveal', 'complete', { timeout: 12000 });
+  await expect(poster).toBeHidden();
+  await expect(picture).toHaveAttribute('src', heroSession.picture);
+  await expect(picture).toHaveJSProperty('paused', false);
+  await expect(hero.locator('[data-hero-soundtrack]')).toHaveJSProperty('paused', true);
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(hero).toHaveAttribute('data-preview-reveal', 'holding');
+  await expect(poster).toBeVisible();
 });
 
-test('the opening lets visitors enter with sound', async ({ page }) => {
+test('the homepage soundtrack starts on request and stays synchronized', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/');
-  const intro = artistIntro(page);
-  const soundtrack = page.locator('[data-hero-soundtrack]');
-  await expect(intro).toBeVisible();
-  await expect(soundtrack).toHaveJSProperty('paused', true);
-  await intro.getByRole('button', { name: 'Enter with sound' }).click();
-  await expect(intro).toBeHidden();
-  await expect(soundtrack).toHaveJSProperty('paused', false);
-
   const hero = page.locator('[data-hero-sequence]');
-  const frame = hero.locator('[data-hero-backdrop]');
-  await expect(hero).toHaveAttribute('data-intro-phase', 'revealing');
-  await expect(frame).toHaveCSS('animation-name', 'hero-arrival-image');
-  await expect(frame).toHaveCSS('animation-duration', '1.3s');
-  await expect(frame).not.toHaveCSS('transform', 'none');
-
-  await expect(hero).toHaveAttribute('data-cinematic', 'true');
-  await expect(frame).toHaveCSS('transform', 'none');
-  expect(await frame.boundingBox()).toEqual(await hero.locator('[data-hero-stage]').boundingBox());
-  await expect(page.getByRole('button', { name: 'Mute soundtrack' })).toBeVisible();
+  const picture = hero.locator('[data-hero-session-picture]');
+  const soundtrack = hero.locator('[data-hero-soundtrack]');
+  await expect(hero).toHaveAttribute('data-preview-reveal', 'playing', { timeout: 12000 });
+  await expect(soundtrack).toHaveJSProperty('paused', true);
+  await hero.getByRole('button', { name: 'Play soundtrack' }).click();
+  await expect(soundtrack).toHaveJSProperty('paused', false);
+  await expect(picture).toHaveJSProperty('muted', true);
+  await expect.poll(() => hero.evaluate((element) => {
+    const video = element.querySelector<HTMLVideoElement>('[data-hero-session-picture]')!;
+    const audio = element.querySelector<HTMLAudioElement>('[data-hero-soundtrack]')!;
+    return Math.abs(video.currentTime - audio.currentTime);
+  })).toBeLessThanOrEqual(.45);
+  await hero.getByRole('button', { name: 'Mute soundtrack' }).click();
+  await expect(soundtrack).toHaveJSProperty('paused', true);
 });
 
-test('Escape skips the intro and leaves the soundtrack muted', async ({ page }) => {
+test('switching to reduced motion settles the reveal and keeps the poster visible', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/');
-  const intro = artistIntro(page);
-  await expect(intro).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(intro).toBeHidden();
-  await expect(page.locator('[data-hero-soundtrack]')).toHaveJSProperty('paused', true);
-  await expect(page.getByRole('button', { name: 'Play soundtrack' })).toBeVisible();
+  const hero = page.locator('[data-hero-sequence]');
+  await expect(hero).toHaveAttribute('data-preview-reveal', 'playing', { timeout: 12000 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(hero).not.toHaveAttribute('data-cinematic', 'true');
+  await expect(hero).toHaveAttribute('data-preview-reveal', 'complete');
+  await expect(hero.locator('[data-hero-poster]')).toBeVisible();
+  await expect(hero.locator('[data-hero-session-picture]')).toHaveJSProperty('paused', true);
+  await expect(hero.getByRole('button', { name: 'Play soundtrack' })).toBeVisible();
 });
 
-test('the intro is bypassed on a direct link to a homepage section', async ({ page }) => {
+test('a direct link reaches the homepage comparison with the soundtrack off', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/#hear-the-difference');
-  await expect(page.locator('[data-hero-sequence]')).toHaveAttribute('data-cinematic', 'true');
-  await expect(artistIntro(page)).toBeHidden();
+  const hero = page.locator('[data-hero-sequence]');
+  await expect(hero).toHaveAttribute('data-cinematic', 'true');
+  await expect(page.locator('#hear-the-difference')).toBeInViewport();
+  await expect(page.locator('[data-artist-loader]')).toHaveCount(0);
+  await expect(hero.locator('[data-hero-soundtrack]')).toHaveJSProperty('paused', true);
+});
+
+test('mouse wheel scrolling keeps the hero controls readable and in place', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/');
+  await waitForCinematicHero(page);
+  await page.evaluate(() => document.fonts.ready.then(() => {}));
+
+  const actions = page.locator('.hero-actions');
+  const positions = () => actions.locator('button, a').evaluateAll((controls) => controls.map((control) => {
+    const { x, y, width, height } = control.getBoundingClientRect();
+    return { x, y, width, height };
+  }));
+  const before = await positions();
+  await actions.evaluate((element) => {
+    const labels = element.textContent;
+    const observer = new MutationObserver(() => {
+      if (element.textContent !== labels) element.setAttribute('data-labels-shifted', 'true');
+    });
+    observer.observe(element, { childList: true, characterData: true, subtree: true });
+  });
+
+  const watch = before[2];
+  await page.mouse.move(watch.x + watch.width / 2, watch.y + watch.height / 2);
+  await page.mouse.wheel(0, 600);
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(480);
+  await expect(actions).not.toHaveAttribute('data-labels-shifted', 'true');
+  await expect(actions.getByRole('button', { name: 'Strike cymbal' })).toHaveText('Strike cymbal');
+  await expect(actions.getByRole('link', { name: 'Watch performance' })).toHaveText('Watch performance');
+  expect(await positions()).toEqual(before);
+});
+
+test('drag resizing preserves the current hero chapter and picture playback', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/');
+  await waitForCinematicHero(page);
+
+  const hero = page.locator('[data-hero-sequence]');
+  const picture = hero.locator('[data-hero-session-picture]');
+  await seekHero(hero, .55);
+  await expect(hero).toHaveAttribute('data-scene', 'flow');
+  await expect(picture).toHaveJSProperty('paused', false);
+  const initialTime = await picture.evaluate((video: HTMLVideoElement) => video.currentTime);
+  const initialScroll = await page.evaluate(() => scrollY);
+
+  for (const [width, height] of [[1200, 690], [900, 580], [800, 540], [765, 550], [1080, 620], [1440, 900]]) {
+    await page.setViewportSize({ width, height });
+    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await expect(hero).toHaveAttribute('data-cinematic', 'true');
+    await expect(hero).toHaveAttribute('data-scene', 'flow');
+    await expect(picture).toHaveJSProperty('paused', false);
+  }
+
+  await expect(picture).toHaveJSProperty('paused', false);
+  expect(await picture.evaluate((video: HTMLVideoElement) => video.currentTime)).toBeGreaterThan(initialTime);
+  expect(Math.abs(await page.evaluate(() => scrollY) - initialScroll)).toBeLessThanOrEqual(1);
 });
 
 test('hero keeps the session playing across chapters and holds the quiet notes before reversing', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/');
-  await skipArtistIntro(page);
+  await waitForCinematicHero(page);
   const hero = page.locator('[data-hero-sequence]');
   const poster = hero.locator('[data-hero-poster]');
   const chapters = hero.locator('[data-hero-chapter]');
@@ -226,7 +290,8 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
 
   await expect(hero).toHaveAttribute('data-scene', 'portrait');
   await expect(hero).toHaveAttribute('data-opening-edit', 'true');
-  await expect(poster).toHaveCSS('opacity', '1');
+  await expect(hero).toHaveAttribute('data-preview-reveal', 'complete', { timeout: 12000 });
+  await expect(poster).toBeHidden();
   await expect(hero.locator('.hero-plate img')).toHaveCSS('object-fit', 'cover');
   await expect(hero.locator('.hero-plate img')).toHaveCSS('object-position', '50% 0%');
   await expect(chapters).toHaveCount(7);
@@ -234,13 +299,13 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
   await expect(discovery).toBeHidden();
   await expect(hero.getByRole('button', { name: 'Next scene' })).toHaveCount(0);
   await expect(hero.getByRole('navigation', { name: 'Film chapters' })).toHaveCount(0);
-  await expect(picture).toHaveAttribute('src', studioOpeningEdit.picture);
+  await expect(picture).toHaveAttribute('src', heroSession.picture);
+  await expect(hero.locator('.hero-opening-credits [data-hero-type]')).toHaveCount(1);
   await expect(soundtrack).toHaveAttribute('src', '/videos/sergio-hero-soundtrack.m4a');
-  await expect(picture).toHaveJSProperty('paused', true);
+  await expect(picture).toHaveJSProperty('paused', false);
   await expect(picture).toHaveJSProperty('muted', true);
   await expect(picture).toHaveJSProperty('loop', false);
-  await expect(flowPicture).toHaveAttribute('src', '/videos/sergio-flow-insert.mp4');
-  await expect(flowPicture).toHaveJSProperty('muted', true);
+  await expect(flowPicture).toHaveCount(0);
   await expect(soundtrack).toHaveJSProperty('loop', true);
   await expect(sound).toBeVisible();
   await page.evaluate(() => document.fonts.ready.then(() => {}));
@@ -263,11 +328,9 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
   await seekHero(hero, .18);
   await expect(sabian).toBeHidden();
   await expect(hero).toHaveAttribute('data-scene', 'portrait');
-  await expect(poster).toHaveCSS('opacity', '1');
+  await expect(poster).toBeHidden();
   await expect(hero.locator('[data-hero-session]')).toBeVisible();
-  await expect(picture).toHaveCSS('opacity', '1');
-  await expect(picture).toHaveJSProperty('paused', true);
-  await expect.poll(pictureTime).toBeGreaterThan(3);
+  await expect(picture).toHaveJSProperty('paused', false);
 
   await seekHero(hero, .32);
   await expect(yamaha).toBeVisible();
@@ -276,7 +339,7 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
   await visitChapter(.34, 'groove', 'Groove');
   await expect(picture).toHaveCSS('opacity', '1');
   await expect(picture).toHaveJSProperty('paused', false);
-  await expect.poll(pictureTime).toBeGreaterThan(studioOpeningEdit.handoff + .8);
+  await expect.poll(pictureTime).toBeGreaterThan(.8);
   await playSound.click();
   await expect(muteSound).toBeVisible();
   await expect(soundtrack).toHaveJSProperty('paused', false);
@@ -293,8 +356,7 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
     await visitChapter(position, scene, title);
     if (scene === 'control') await expect(yamaha).toBeHidden();
     if (scene === 'flow') {
-      await expect(flowPicture).toHaveJSProperty('paused', false);
-      await expect.poll(() => flowPicture.evaluate((video: HTMLVideoElement) => video.currentTime)).toBeGreaterThan(.1);
+      await expect(flowPicture).toHaveCount(0);
       await expect(soundtrack).toHaveJSProperty('paused', false);
     }
     await expect(picture).toHaveJSProperty('paused', false);
@@ -310,19 +372,18 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
   await expect(discovery).toBeHidden();
   await expect(picture).toHaveCSS('object-fit', 'cover');
   await expect(picture).toHaveJSProperty('paused', false);
-  await expect(flowPicture).toHaveJSProperty('paused', true);
   expect(await picture.evaluate((video, original) => video === original, sessionPicture)).toBe(true);
   expect(await pictureTime()).toBeGreaterThanOrEqual(lastPosition - .35);
 
   await expect(soundtrack).toHaveJSProperty('paused', false);
   await expect(picture).toHaveJSProperty('muted', true);
-  await expect.poll(() => hero.evaluate((element, handoff) => {
+  await expect.poll(() => hero.evaluate((element) => {
     const video = element.querySelector<HTMLVideoElement>('[data-hero-session-picture]')!;
     const audio = element.querySelector<HTMLAudioElement>('[data-hero-soundtrack]')!;
-    const duration = video.duration - handoff;
-    const drift = Math.abs(video.currentTime - handoff - (audio.currentTime % duration));
+    const duration = video.duration;
+    const drift = Math.abs(video.currentTime - (audio.currentTime % duration));
     return Math.min(drift, duration - drift);
-  }, studioOpeningEdit.handoff)).toBeLessThanOrEqual(.45);
+  })).toBeLessThanOrEqual(.45);
   await muteSound.click();
   await expect(playSound).toBeVisible();
   await expect(soundtrack).toHaveJSProperty('paused', true);
@@ -340,17 +401,17 @@ test('hero keeps the session playing across chapters and holds the quiet notes b
 
   await seekHero(hero, 0);
   await expect(hero).toHaveAttribute('data-scene', 'portrait');
-  await expect(poster).toHaveCSS('opacity', '1');
+  await expect(poster).toBeHidden();
   await expect(discovery).toBeHidden();
   await expect(film).toHaveAttribute('inert', '');
-  await expect(picture).toHaveJSProperty('paused', true);
+  await expect(picture).toHaveJSProperty('paused', false);
 });
 
 test('sponsor entrances complete and exits wait for their own triggers', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/');
-  await skipArtistIntro(page);
+  await waitForCinematicHero(page);
   const hero = page.locator('[data-hero-sequence]');
   const sabian = hero.locator('[data-hero-sponsor-scene="sabian"]');
   const yamaha = hero.locator('[data-hero-sponsor-scene="yamaha"]');
@@ -399,7 +460,7 @@ test('chapter captions remain visible until their individual exit triggers', asy
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/');
-  await skipArtistIntro(page);
+  await waitForCinematicHero(page);
   const hero = page.locator('[data-hero-sequence]');
   const groove = hero.getByRole('heading', { name: 'Groove', exact: true });
   const musicality = hero.getByRole('heading', { name: 'Musicality', exact: true });
@@ -433,7 +494,7 @@ test('keeps long hero captions within the narrow stage during a reveal', async (
   await page.setViewportSize({ width: 320, height: 720 });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/');
-  await skipArtistIntro(page);
+  await waitForCinematicHero(page);
   const hero = page.locator('[data-hero-sequence]');
   await expect(hero).toHaveAttribute('data-cinematic', 'true');
   await seekHero(hero, .48);
@@ -460,7 +521,7 @@ test('keeps long hero captions within the narrow stage during a reveal', async (
 
 test('cymbal responds to a keyboard strike with the graphical fallback available', async ({ page }) => {
   await page.goto('/');
-  await skipArtistIntro(page);
+  await waitForCinematicHero(page);
   const strike = page.getByRole('button', { name: 'Strike the cymbal' });
   await strike.focus();
   await page.keyboard.press('Enter');

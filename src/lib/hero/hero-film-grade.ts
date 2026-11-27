@@ -25,6 +25,7 @@ export interface FilmGrade {
 }
 
 const frameInterval = 1000 / 24
+const resizeSettle = 120
 const slicePass = 1700
 const sliceInterval = 7600
 // Where each slice waits when it is out of the picture, and how long it follows the one before it.
@@ -282,6 +283,8 @@ function grade(canvas: HTMLCanvasElement, source: Picture, look: () => FilmLook,
   let width = 1
   let height = 1
   let rect = { x: 0, y: 0, width: 1, height: 1 }
+  let layoutDirty = true
+  let resizeAfter = Infinity
   let wash = 0
   let washFrame = 0
 
@@ -304,17 +307,32 @@ function grade(canvas: HTMLCanvasElement, source: Picture, look: () => FilmLook,
     return Boolean(dimensions(source)[0]) && (!isVideo(source) || source.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA)
   }
 
-  function measure() {
+  function measure(now: number) {
     const picture = dimensions(source)
     const box = { width: canvas.clientWidth, height: canvas.clientHeight }
     if (!picture[0] || !picture[1] || !box.width || !box.height) return
 
-    const density = Math.min(window.devicePixelRatio || 1, 1.5, 1680 / Math.max(box.width, box.height))
-    width = Math.max(1, Math.round(box.width * density))
-    height = Math.max(1, Math.round(box.height * density))
-    if (canvas.width !== width) canvas.width = width
-    if (canvas.height !== height) canvas.height = height
-    rect = placement(source, { width, height, picture: [picture[0], picture[1]] })
+    // Resizing clears the drawing buffer. Only allocate as part of a draw and
+    // keep using the existing buffer while the viewport is still changing.
+    if (width === 1 || now >= resizeAfter) {
+      const density = Math.min(window.devicePixelRatio || 1, 1.5, 1680 / Math.max(box.width, box.height))
+      width = Math.max(1, Math.round(box.width * density))
+      height = Math.max(1, Math.round(box.height * density))
+      if (canvas.width !== width) canvas.width = width
+      if (canvas.height !== height) canvas.height = height
+      resizeAfter = Infinity
+    }
+
+    const placed = placement(source, { ...box, picture })
+    const scaleX = width / box.width
+    const scaleY = height / box.height
+    rect = {
+      x: placed.x * scaleX,
+      y: placed.y * scaleY,
+      width: placed.width * scaleX,
+      height: placed.height * scaleY,
+    }
+    layoutDirty = false
   }
 
   /** The moving picture gets a player of its own, so the film's own playback is never disturbed. */
@@ -430,24 +448,27 @@ function grade(canvas: HTMLCanvasElement, source: Picture, look: () => FilmLook,
         gl.bindTexture(gl.TEXTURE_2D, resources.texture)
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source)
         uploaded = isVideo(source) ? source.currentTime : 0
-        measure()
       }
       if (uploaded >= 0) {
+        const resizing = layoutDirty || resizeAfter !== Infinity
+        if (layoutDirty || now >= resizeAfter) measure(now)
         draw(now)
-        cost += (performance.now() - started - cost) / Math.min(samples + 1, 30)
-        samples += 1
-        // Give up the grade rather than the frame rate on a machine that cannot afford it.
-        if (samples > 40 && cost > 9) {
-          unavailable = true
-          canvas.removeAttribute('data-graded')
-          return
+        if (!resizing) {
+          cost += (performance.now() - started - cost) / Math.min(samples + 1, 30)
+          samples += 1
+          // Layout paints do not represent steady-state rendering cost.
+          if (samples > 40 && cost > 9) {
+            unavailable = true
+            canvas.removeAttribute('data-graded')
+            return
+          }
         }
         canvas.setAttribute('data-graded', '')
       }
     }
 
     // With motion reduced one finished frame is enough.
-    if (motion.matches && uploaded >= 0 && !washFrame) return
+    if (motion.matches && uploaded >= 0 && !washFrame && resizeAfter === Infinity && !layoutDirty) return
     raf = requestAnimationFrame(tick)
   }
 
@@ -490,14 +511,20 @@ function grade(canvas: HTMLCanvasElement, source: Picture, look: () => FilmLook,
         unavailable = true
         return
       }
-      measure()
+      layoutDirty = true
     }
     schedule()
   }
 
   function forget() {
     uploaded = -1
-    measure()
+    layoutDirty = true
+    schedule()
+  }
+
+  function layoutChanged() {
+    layoutDirty = true
+    resizeAfter = performance.now() + resizeSettle
     schedule()
   }
 
@@ -538,16 +565,18 @@ function grade(canvas: HTMLCanvasElement, source: Picture, look: () => FilmLook,
     inView = entry.isIntersecting
     start()
   })
-  const size = new ResizeObserver(forget)
+  const size = new ResizeObserver(layoutChanged)
 
   intersection.observe(canvas)
   size.observe(canvas)
   source.addEventListener('load', forget)
   source.addEventListener('loadeddata', forget)
+  source.addEventListener('resize', forget)
   source.addEventListener('seeked', schedule)
   source.addEventListener('play', schedule)
   document.addEventListener('visibilitychange', start)
   motion.addEventListener('change', schedule)
+  window.addEventListener('resize', layoutChanged)
   stage?.addEventListener('pointermove', aim, { passive: true })
   stage?.addEventListener('pointerenter', enter)
   stage?.addEventListener('pointerleave', leave)
@@ -576,10 +605,12 @@ function grade(canvas: HTMLCanvasElement, source: Picture, look: () => FilmLook,
       size.disconnect()
       source.removeEventListener('load', forget)
       source.removeEventListener('loadeddata', forget)
+      source.removeEventListener('resize', forget)
       source.removeEventListener('seeked', schedule)
       source.removeEventListener('play', schedule)
       document.removeEventListener('visibilitychange', start)
       motion.removeEventListener('change', schedule)
+      window.removeEventListener('resize', layoutChanged)
       stage?.removeEventListener('pointermove', aim)
       stage?.removeEventListener('pointerenter', enter)
       stage?.removeEventListener('pointerleave', leave)
