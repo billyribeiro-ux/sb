@@ -60,9 +60,10 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
     flash, lightLeak, scrollInstruction, maskTop, maskBottom, streak,
   };
   const launch = window.matchMedia(heroLaunchQuery);
-  let initialHash = launch.matches ? location.hash : '';
+  const initialHash = launch.matches ? location.hash : '';
   const runwayEnd = () => `+=${root.clientHeight - stage.clientHeight}`;
   let disposed = false;
+  let anchorFrame = 0;
   let revert: (() => void) | undefined;
 
   async function install() {
@@ -123,13 +124,6 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
       const screens = Number.parseFloat(getComputedStyle(root).getPropertyValue('--hero-runway'));
       const distance = stage.getBoundingClientRect().height * screens;
       if (distance > 0 && Number.isFinite(distance)) root.style.setProperty('--hero-runway-distance', `${distance}px`);
-
-      // The browser can land on an anchor before the cinematic runway exists.
-      const anchor = initialHash === location.hash ? document.getElementById(initialHash.slice(1)) : null;
-      initialHash = '';
-      if (anchor && !root.contains(anchor) && (root.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_FOLLOWING)) {
-        anchor.scrollIntoView({ behavior: 'instant' });
-      }
 
       const illumination = { progress: 0 };
       const openingSweep = { progress: 0 };
@@ -775,7 +769,17 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
     });
 
     void document.fonts?.ready.then(() => {
-      if (!disposed) ScrollTrigger.refresh();
+      if (disposed) return;
+      ScrollTrigger.refresh();
+
+      // The browser can land on the fragment before the cinematic runway has its final height.
+      const anchor = initialHash ? document.getElementById(initialHash.slice(1)) : null;
+      if (!anchor || root.contains(anchor) || !(root.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_FOLLOWING)) return;
+      anchorFrame = requestAnimationFrame(() => {
+        if (root.dataset.cinematic === 'true' && location.hash === initialHash) {
+          anchor.scrollIntoView({ behavior: 'instant' });
+        }
+      });
     });
   }
 
@@ -791,6 +795,7 @@ export const heroSequence: Action<HTMLElement, HeroSequenceOptions> = (root, opt
   return {
     destroy() {
       disposed = true;
+      cancelAnimationFrame(anchorFrame);
       launch.removeEventListener('change', mountWhenAllowed);
       revert?.();
     },
